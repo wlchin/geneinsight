@@ -6,12 +6,12 @@ import os
 from setuptools import setup, find_packages
 
 # Package meta-data
-NAME = 'topicgenes'
+NAME = 'geneinsight'
 DESCRIPTION = 'Topic modeling pipeline for gene sets with enrichment analysis'
-URL = 'https://github.com/yourusername/topicgenes'
+URL = 'https://github.com/yourusername/geneinsight'
 EMAIL = 'your.email@example.com'
 AUTHOR = 'Your Name'
-REQUIRES_PYTHON = '>=3.9,<3.12'
+REQUIRES_PYTHON = '>=3.9,<3.13'
 VERSION = '0.1.0'
 
 # Required packages
@@ -89,7 +89,13 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'topicgenes=topicgenes.cli:main',
+            'geneinsight=geneinsight.cli:main',
+            'geneinsight-enrichment=geneinsight.scripts.geneinsight_enrichment:main',
+            'geneinsight-topic=geneinsight.scripts.geneinsight_topic_modeling:main',
+            'geneinsight-prompt=geneinsight.scripts.geneinsight_prompt_gen:main',
+            'geneinsight-api=geneinsight.scripts.geneinsight_api_process:main',
+            'geneinsight-hypergeometric=geneinsight.scripts.geneinsight_hypergeometric:main',
+            'geneinsight-filter=geneinsight.scripts.geneinsight_filter:main',
         ],
     },
 )

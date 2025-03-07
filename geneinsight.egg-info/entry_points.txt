@@ -1,0 +1,2 @@
+[console_scripts]
+topicgenes = topicgenes.cli:main

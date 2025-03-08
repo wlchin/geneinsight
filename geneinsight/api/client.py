@@ -7,7 +7,23 @@ import logging
 import pandas as pd
 from tqdm import tqdm
 from joblib import Parallel, delayed
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
+from pathlib import Path
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
+
+# Check for a local .env file and load it if available
+env_path = Path('.env')
+if env_path.exists():
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(dotenv_path=env_path)
+        logger.info("Loaded environment variables from .env file.")
+    except ImportError:
+        logger.warning("python-dotenv not installed; cannot load .env file.")
+else:
+    logger.info("No .env file found; relying on system environment variables.")
 
 # Import instructor + OpenAI if available
 try:
@@ -17,18 +33,9 @@ try:
 except ImportError:
     APIS_AVAILABLE = False
 
-logger = logging.getLogger(__name__)
-
-class TopicHeading:
-    """Class to represent a topic heading response."""
-    
-    def __init__(self, topic: str):
-        self.topic = topic
-    
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'TopicHeading':
-        """Create from dictionary."""
-        return cls(topic=data.get('topic', ''))
+class TopicHeading(BaseModel):
+    """Pydantic model to represent a topic heading response."""
+    topic: str = Field(..., description="A title for the subtopic")
 
 def fetch_subtopic_heading(
     user_prompt: str,
@@ -43,15 +50,15 @@ def fetch_subtopic_heading(
     Get a subtopic heading from the API.
     
     Args:
-        user_prompt: The user portion of the prompt
-        system_prompt: The system portion of the prompt
-        service: API service to use ("openai", "together", "ollama")
-        api_key: API key
-        model: Model to use
-        base_url: Base URL for the API service
+        user_prompt: The user portion of the prompt.
+        system_prompt: The system portion of the prompt.
+        service: API service to use ("openai", "together", "ollama").
+        api_key: API key.
+        model: Model to use.
+        base_url: Base URL for the API service.
         
     Returns:
-        The generated topic heading
+        The generated topic heading.
     """
     if not APIS_AVAILABLE:
         logger.warning("API modules (openai, instructor) not installed. Returning placeholder.")
@@ -60,28 +67,23 @@ def fetch_subtopic_heading(
     try:
         # Initialize the appropriate client
         if service.lower() == "together":
-            # For Together
             together_client = OpenAI(api_key=api_key, base_url=base_url)
             client = instructor.from_openai(together_client, mode=instructor.Mode.TOOLS)
         elif service.lower() == "openai":
-            # For OpenAI
             openai_client = OpenAI(api_key=api_key)
             client = instructor.from_openai(openai_client, mode=instructor.Mode.TOOLS)
         elif service.lower() == "ollama":
-            # For Ollama
             ollama_client = OpenAI(api_key=api_key or "ollama", base_url=base_url)
             client = instructor.from_openai(ollama_client, mode=instructor.Mode.TOOLS)
         else:
             raise ValueError(f"Unsupported service: {service}")
 
-        # Build your message array
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ]
 
-        # Create the completion with typed validation
-        response = client.chat.completions.create(
+        response: TopicHeading = client.chat.completions.create(
             model=model,
             messages=messages,
             response_model=TopicHeading
@@ -105,22 +107,20 @@ def process_subtopic_row(
     Process a single row for subtopic generation.
     
     Args:
-        row: Row from the prompts DataFrame
-        service: API service to use
-        api_key: API key
-        model: Model to use
-        base_url: Base URL for the API service
+        row: Row from the prompts DataFrame.
+        service: API service to use.
+        api_key: API key.
+        model: Model to use.
+        base_url: Base URL for the API service.
         
     Returns:
-        Dictionary with the row data and generated result
+        Dictionary with the row data and generated result.
     """
-    # Extract row data
     seed = row["seed"]
     topic_label = row["topic_label"]
     major_transcript = row["major_transcript"]
     max_words = int(row["max_words"]) if "max_words" in row else 10
 
-    # Construct the system prompt 
     long_prompt = (
         f"Using the provided information, including documents, keywords, and the major heading, "
         f"generate a single subtopic heading of at most {max_words} words. "
@@ -129,10 +129,8 @@ def process_subtopic_row(
         f"Respond only with the subtopic heading."
     )
     
-    # Construct the user prompt
     user_prompt = long_prompt + f"\n\nPROVIDED INFORMATION:\n{major_transcript}"
 
-    # Call the typed function
     generated_subtopic = fetch_subtopic_heading(
         user_prompt=user_prompt,
         system_prompt="You are a helpful AI assistant",
@@ -161,21 +159,19 @@ def batch_process_api_calls(
     Batch process API calls for subtopic generation.
     
     Args:
-        prompts_csv: Path to CSV with the input prompts
-        output_api: Path to output CSV for results
-        service: Which service to use
-        model: Which model to use
-        base_url: Base URL for the API service
-        n_jobs: Number of parallel workers
+        prompts_csv: Path to CSV with the input prompts.
+        output_api: Path to output CSV for results.
+        service: Which service to use.
+        model: Which model to use.
+        base_url: Base URL for the API service.
+        n_jobs: Number of parallel workers.
         
     Returns:
-        DataFrame with the results
+        DataFrame with the results.
     """
-    # Load CSV
     df_prompts = pd.read_csv(prompts_csv)
     logger.info(f"Loaded {len(df_prompts)} rows from {prompts_csv}")
 
-    # Filter for subtopic_BERT
     df_subtopic = df_prompts[df_prompts["prompt_type"] == "subtopic_BERT"]
     logger.info(f"Found {len(df_subtopic)} rows with 'subtopic_BERT'")
 
@@ -191,13 +187,11 @@ def batch_process_api_calls(
     elif service.lower() == "openai":
         api_key = os.getenv("OPENAI_API_KEY")
     elif service.lower() == "ollama":
-        # Ollama doesn't require an API key
         api_key = "ollama"
-    
-    if not api_key and service.lower() not in ["ollama"]:
-        logger.warning(f"API key for {service} not found in environment. Results may be affected.")
 
-    # Parallel process
+    if not api_key and service.lower() not in ["ollama"]:
+        raise ValueError(f"API key for {service} not found in .env file or environment variables.")
+
     logger.info(f"Processing {len(df_subtopic)} rows with {n_jobs} parallel jobs")
     results = Parallel(n_jobs=n_jobs)(
         delayed(process_subtopic_row)(
@@ -210,13 +204,9 @@ def batch_process_api_calls(
         for _, row in tqdm(df_subtopic.iterrows(), total=len(df_subtopic), desc="Processing subtopics")
     )
 
-    # Create results DataFrame
     df_results = pd.DataFrame(results)
     
-    # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(output_api), exist_ok=True)
-    
-    # Save results to CSV
     df_results.to_csv(output_api, index=False)
     logger.info(f"Results saved to {output_api}")
     

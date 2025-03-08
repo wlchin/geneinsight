@@ -98,9 +98,11 @@ setup(
             'geneinsight-api=geneinsight.scripts.geneinsight_api_process:main',
             'geneinsight-hypergeometric=geneinsight.scripts.geneinsight_hypergeometric:main',
             'geneinsight-filter=geneinsight.scripts.geneinsight_filter:main',
+            'geneinsight-meta=topicgenes.scripts.topicgenes_meta:main',
+            'geneinsight-counter=topicgenes.scripts.topicgenes_counter:main',
         ],
     },
-    
+
     package_data={
     'topicgenes.report': ['assets/*.png'],
     }

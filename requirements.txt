@@ -37,3 +37,5 @@ colorcet>=3.0.0
 sphinx>=4.3.0
 sphinx-rtd-theme>=1.0.0
 pillow>=9.0.0
+stringdb==0.1.5
+ollama==0.28.1

@@ -150,6 +150,25 @@ def parse_args():
         help="Path to configuration file (JSON or YAML)"
     )
     
+    # Add report generation arguments
+    parser.add_argument(
+        "--generate-report",
+        action="store_true",
+        help="Generate an HTML report after pipeline completion"
+    )
+    
+    parser.add_argument(
+        "--report-dir",
+        default="./report",
+        help="Directory to store the generated report (default: ./report)"
+    )
+    
+    parser.add_argument(
+        "--report-title",
+        default=None,
+        help="Title for the generated report (default: derived from gene set name)"
+    )
+    
     parser.add_argument(
         "-v", "--version",
         action="version",
@@ -224,6 +243,38 @@ def main():
         
         logger.info("Pipeline completed successfully!")
         logger.info(f"Results available at: {output_path}")
+        
+        # Generate report if requested
+        if args.generate_report:
+            logger.info("Generating HTML report...")
+            
+            # Import here to avoid importing unless needed
+            try:
+                from .scripts.geneinsight_report import generate_report
+                
+                # Derive report title from gene set name if not provided
+                report_title = args.report_title
+                if not report_title:
+                    gene_set_name = os.path.splitext(os.path.basename(args.query_gene_set))[0]
+                    report_title = f"TopicGenes Analysis: {gene_set_name}"
+                
+                # Generate the report
+                results_dir = os.path.dirname(output_path) if os.path.isfile(output_path) else output_path
+                report_path = generate_report(
+                    results_dir=results_dir,
+                    output_dir=args.report_dir,
+                    title=report_title
+                )
+                
+                if report_path:
+                    logger.info(f"Report generated successfully at {report_path}")
+                    logger.info(f"Open {os.path.join(report_path, 'html/build/html/index.html')} in a web browser to view.")
+                else:
+                    logger.error("Report generation failed.")
+            except ImportError as e:
+                logger.error(f"Could not generate report: {e}")
+                logger.error("Make sure you have installed the report generation dependencies:")
+                logger.error("pip install umap-learn plotly colorcet sphinx sphinx-rtd-theme pillow")
         
     except KeyboardInterrupt:
         logger.warning("Pipeline interrupted by user.")

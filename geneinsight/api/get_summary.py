@@ -6,8 +6,10 @@ import logging
 import json
 import torch
 from sentence_transformers import SentenceTransformer, util
+# Removed: from rouge_score import rouge_scorer
 from collections import Counter
 from dotenv import load_dotenv
+from ollama import chat, ChatResponse
 import pickle
 
 # Configure logging
@@ -39,14 +41,17 @@ class RAGModule:
 
     def get_top_documents(self, query, N=5):
         logging.info("Entering get_top_documents() with query='%s' and N=%d", query, N)
-        query_embedding = self.embedder.encode(str(query), convert_to_tensor=True)
+        query_embedding = self.embedder.encode(query, convert_to_tensor=True)
         cosine_scores = util.pytorch_cos_sim(query_embedding, self.document_embeddings)[0]
-        top_results_indices = torch.topk(cosine_scores, k=N).indices.cpu()  # move to CPU before converting
+        top_results_indices = torch.topk(cosine_scores, k=N).indices
         logging.info("Top documents indices: %s", top_results_indices.tolist())
         return top_results_indices
 
     def get_context(self, query, top_results_indices):
-        logging.info("Entering get_context() with query='%s' and top_results_indices=%s", query, top_results_indices.tolist())
+        logging.info(
+            "Entering get_context() with query='%s' and top_results_indices=%s",
+            query, top_results_indices.tolist()
+        )
         context_documents = " ".join(
             [f"Document {i+1}: {self.documents[idx]}" for i, idx in enumerate(top_results_indices)]
         )
@@ -57,17 +62,52 @@ class RAGModule:
         logging.info("Generated context for LLM.")
         return context
 
-    def get_text_response(self, query, num_results=5):
-        logging.info("Entering get_text_response() with query='%s'", query)
+    def get_chat_response(self, documents_string):
+        logging.info("Entering get_chat_response()...")
+
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {
+                "role": "user",
+                "content": (
+                    "Use the title and context to write a succinct paragraph on the topic. "
+                    "The paragraph should be between three to five sentences long.\n"
+                    f"{documents_string}"
+                ),
+            },
+        ]
+
+        response: ChatResponse = chat(
+            model='gemma2:2b',
+            messages=messages
+        )
+        
+        text_response = response.message.content
+        logging.info("Received chat response of length=%d chars", len(text_response))
+        return text_response
+
+    def calculate_rouge(self, reference, hypothesis):
+        logging.info("ROUGE score calculation is disabled. Returning empty dictionary.")
+        return {}
+
+    def get_text_response(self, query, num_results=5, calculate_rouge=True):
+        logging.info("Entering get_text_response() with query='%s', calculate_rouge=%s",
+                     query, calculate_rouge)
         top_results_indices = self.get_top_documents(query, N=num_results)
         context_documents = self.get_context(query, top_results_indices)
-        response_text = ""
+
+        response_text = self.get_chat_response(context_documents)
+        rouge_scores = {}
+        if calculate_rouge:
+            rouge_scores = self.calculate_rouge(context_documents, response_text)
+
         response_dict = {
             "query": query,
             "context": context_documents,
             "text": response_text,
-            "rouge": {}
+            "rouge": rouge_scores,
         }
+
         logging.info("Returning from get_text_response() for query='%s'.", query)
         return response_dict, response_text
 
@@ -96,11 +136,17 @@ class RAGModule:
         logging.info("References and unique genes formatted.")
         return references, unique_genes
 
-    def get_summary_to_query(self, query, num_results=5):
-        logging.info("Entering get_summary_to_query() with query='%s'", query)
-        response_dict, _ = self.get_text_response(query, num_results=num_results)
+    def get_summary_to_query(self, query, num_results=5, calculate_rouge=True):
+        logging.info("Entering get_summary_to_query() with query='%s', calculate_rouge=%s",
+                     query, calculate_rouge)
+        response_dict, _ = self.get_text_response(
+            query,
+            num_results=num_results,
+            calculate_rouge=calculate_rouge
+        )
         top_results_indices = self.get_top_documents(query, N=num_results)
         references, unique_genes = self.format_references_and_genes(top_results_indices)
+
         output = {
             "response": response_dict.get("text", ""),   
             "rouge": response_dict.get("rouge", {}),     
@@ -111,9 +157,14 @@ class RAGModule:
         logging.info("Exiting get_summary_to_query() with output keys=%s", list(output.keys()))
         return output
 
-    def get_summary_to_query_df(self, query, num_results=5):
-        logging.info("Entering get_summary_to_query_df() with query='%s'", query)
-        output = self.get_summary_to_query(query, num_results=num_results)
+    def get_summary_to_query_df(self, query, num_results=5, calculate_rouge=True):
+        logging.info("Entering get_summary_to_query_df() with query='%s', calculate_rouge=%s",
+                     query, calculate_rouge)
+        output = self.get_summary_to_query(
+            query,
+            num_results=num_results,
+            calculate_rouge=calculate_rouge
+        )
 
         response_text = output.get("response", "")
         rouge = output.get("rouge", {})
@@ -231,8 +282,9 @@ def generate_results(
 ) -> pd.DataFrame:
     results = []
     for topic in tqdm(topics_of_interest, desc="Processing topics"):
-        results_df = x_together.get_summary_to_query_df(topic, num_results=num_results)
+        results_df = x_together.get_summary_to_query_df(topic, num_results=num_results, calculate_rouge=False)
         results.append(results_df)
+
     final_df = pd.concat(results, ignore_index=True)
     return final_df
 
@@ -280,42 +332,3 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     main(args)
-
-# New: Define create_summary to generate a summary from API results and enrichment data.
-def create_summary(api_results_df, enrichment_df, summary_output=None):
-    """
-    Create a summary DataFrame using API results and enrichment data.
-    
-    Args:
-        api_results_df: pandas DataFrame containing API results, expected to have a 'query' column 
-                        or a 'generated_result' column.
-        enrichment_df: pandas DataFrame containing enrichment data for initializing RAGModule.
-        summary_output: Optional path to output the summary CSV file.
-    
-    Returns:
-        summary_df: pandas DataFrame containing summary information for each query.
-    """
-    # If 'query' column is missing, try renaming 'generated_result' to 'query'
-    if 'query' not in api_results_df.columns:
-        if 'generated_result' in api_results_df.columns:
-            api_results_df = api_results_df.rename(columns={'generated_result': 'query'})
-        else:
-            raise ValueError("API results DataFrame must contain a 'query' column or a 'generated_result' column.")
-    
-    # Initialize RAGModule with the enrichment DataFrame
-    rag_module = RAGModule(enrichment_df)
-    
-    summary_frames = []
-    # Process each unique query in the API results
-    for query in api_results_df["query"].unique():
-        df_summary = rag_module.get_summary_to_query_df(query)
-        summary_frames.append(df_summary)
-    
-    # Combine all individual query summaries into one DataFrame.
-    summary_df = pd.concat(summary_frames, ignore_index=True)
-    
-    # Optionally save the summary to a CSV file if a path is provided.
-    if summary_output:
-        summary_df.to_csv(summary_output, index=False)
-    
-    return summary_df

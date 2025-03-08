@@ -1,0 +1,30 @@
+=================
+Embedding map
+=================
+
+This figure is a two-dimensional map where each theme heading is positioned based on the combined semantic information from the main topics and all enriched gene set themes, allowing us to see how similar or different the themes are in meaning. Headings that appear closer together share more common content, helping to visually identify clusters of related biological themes.
+
+.. raw:: html
+   :file: {html_basename}
+
+======================
+Summary statistics
+======================
+
+The following table provides a summary of the key statistics derived from the analysis:
+
+.. list-table:: 
+   :header-rows: 1
+
+   * - Statistic
+     - Value
+{summary_rows}
+
+=================
+Data Files
+=================
+
+The enriched gene sets represent all AI-generated themes, without condensing and filtering. The subheading data represents a detailed breakdown and information of all API calls for subheading generation.
+
+* :download:`enriched_genesets.csv <enriched_genesets.csv>`
+* :download:`subheading_data.csv <subheading_data.csv>`

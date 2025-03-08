@@ -1,28 +1,54 @@
+"""
+Module for generating gene heatmaps.
+"""
+
+import os
 import random
 import string
 import pandas as pd
-from sklearn.preprocessing import MultiLabelBinarizer
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import matplotlib.colors as mcolors
 import matplotlib.patches as mpatches
 import ast
-import argparse
-import os
 import logging
 from tqdm import tqdm
+from typing import List, Dict, Optional, Union, Tuple
 
-cmap = plt.get_cmap('viridis')
-
-# Get the colors for 0 and 1
-color_0 = cmap(0.0)
-color_1 = cmap(1.0)
+logger = logging.getLogger(__name__)
 
 class Geneplotter:
-    def __init__(self, data = None):
+    """
+    Class for plotting gene sets as heatmaps.
+    """
+    
+    def __init__(self, data=None):
+        """
+        Initialize the Geneplotter.
+        
+        Args:
+            data: Optional data to initialize with
+        """
         self.data = data
+        # Get colormap for the plots
+        self.cmap = plt.get_cmap('viridis')
+        # Get the colors for 0 and 1
+        self.color_0 = self.cmap(0.0)
+        self.color_1 = self.cmap(1.0)
 
-    def generate_subsets(self, num_subsets, min_size, max_size):
+    def generate_subsets(self, num_subsets: int, min_size: int, max_size: int) -> List[List[str]]:
+        """
+        Generate random subsets for testing.
+        
+        Args:
+            num_subsets: Number of subsets to generate
+            min_size: Minimum size of each subset
+            max_size: Maximum size of each subset
+            
+        Returns:
+            List of randomly generated subsets
+        """
         subsets = []
         for _ in range(num_subsets):
             size = random.randint(min_size, max_size)
@@ -30,7 +56,17 @@ class Geneplotter:
             subsets.append(subset)
         return subsets
     
-    def add_newlines(self, text, min_distance=50):
+    def add_newlines(self, text: str, min_distance: int = 50) -> str:
+        """
+        Add newlines to long text for better display.
+        
+        Args:
+            text: Input text
+            min_distance: Minimum characters before adding a newline
+            
+        Returns:
+            Formatted text with newlines
+        """
         # Convert the input string into a list of characters
         char_list = list(text)
         
@@ -49,39 +85,42 @@ class Geneplotter:
         # Join the list back into a string and return it
         return ''.join(char_list)
 
-    def plot_heatmap(self, query_set, ref_sets, ontology_sets, ref_labels, ontology_labels, savename):
+    def plot_heatmap(
+        self, 
+        query_set: List[str], 
+        ref_sets: List[List[str]], 
+        ontology_sets: List[List[str]], 
+        ref_labels: List[str], 
+        ontology_labels: List[str], 
+        savename: str
+    ) -> None:
         """
         Plot a heatmap for the given gene sets.
 
-        Parameters
-        ----------
-        query_set : list
-            The query set gene list.
-        ref_sets : list of lists
-            List of 5 reference dictionary gene sets.
-        ontology_sets : list of lists
-            List of 5 ontology dictionary gene sets.
-        ref_labels : list
-            The names of the reference dictionary gene sets.
-        ontology_labels : list
-            The names of the ontology dictionary gene sets.
-        savename : str
-            The name of the file to save the heatmap.
+        Args:
+            query_set: The query set gene list
+            ref_sets: List of reference dictionary gene sets
+            ontology_sets: List of ontology dictionary gene sets
+            ref_labels: The names of the reference dictionary gene sets
+            ontology_labels: The names of the ontology dictionary gene sets
+            savename: The name of the file to save the heatmap
         """
+        from sklearn.preprocessing import MultiLabelBinarizer
+        
         subsets = [query_set] + ref_sets + ontology_sets
 
         mlb = MultiLabelBinarizer()
         binarized_data = mlb.fit_transform(subsets)
         df = pd.DataFrame(binarized_data, columns=mlb.classes_)
 
-        middle_rows_df = df.iloc[1:-5]  # reference sets
-        last_five_rows_df = df.iloc[-5:]  # ontology sets
+        middle_rows_df = df.iloc[1:len(ref_sets)+1]  # reference sets
+        last_rows_df = df.iloc[len(ref_sets)+1:]  # ontology sets
 
         ref_labels = [self.add_newlines(label) for label in ref_labels]
         ontology_labels = [self.add_newlines(label) for label in ontology_labels]
 
         ref_count = len(middle_rows_df)
-        onto_count = len(last_five_rows_df)
+        onto_count = len(last_rows_df)
         total_count = ref_count + onto_count
         height_ratios = [ref_count/total_count, onto_count/total_count]
 
@@ -95,13 +134,13 @@ class Geneplotter:
         axes[0].set_title('StringDB Reference sets')
         axes[0].set_ylabel('')
 
-        sns.heatmap(last_five_rows_df, annot=True, cmap='viridis', cbar=False, ax=axes[1], xticklabels=mlb.classes_, yticklabels=ontology_labels)
+        sns.heatmap(last_rows_df, annot=True, cmap='viridis', cbar=False, ax=axes[1], xticklabels=mlb.classes_, yticklabels=ontology_labels)
         axes[1].set_title('Cross ontology reference sets')
         axes[1].set_xlabel('genes in references')
         axes[1].set_ylabel('')
 
-        present_patch = mpatches.Patch(color=color_1, label='1: Gene is present in reference sets (or theme geneset)')
-        not_present_patch = mpatches.Patch(color=color_0, label='0: Gene is not present in reference sets (or theme geneset)')
+        present_patch = mpatches.Patch(color=self.color_1, label='1: Gene is present in reference sets (or theme geneset)')
+        not_present_patch = mpatches.Patch(color=self.color_0, label='0: Gene is not present in reference sets (or theme geneset)')
 
         # Add the legend to your plot
         legend = plt.legend(bbox_to_anchor=(0.5, -0.5), fontsize='large', loc='upper center', handles=[present_patch, not_present_patch])
@@ -114,105 +153,123 @@ class Geneplotter:
         plt.savefig(savename)
         plt.close()
 
-def dict_to_tuple(dict_str):
+def dict_to_tuple(dict_str: str) -> Tuple[List[str], List[List[str]]]:
     """
     Convert a dictionary string into a tuple with a list of keys and a list of lists of genes.
 
     Args:
-        dict_str (str): The dictionary string to convert.
+        dict_str: The dictionary string to convert
 
     Returns:
-        tuple: A tuple containing a list of keys and a list of lists of genes.
+        A tuple containing a list of keys and a list of lists of genes
     """
-    dict_obj = ast.literal_eval(dict_str)
-    keys = list(dict_obj.keys())
-    gene_lists = [genes.split(", ") for genes in dict_obj.values()]
-    return keys, gene_lists
+    try:
+        dict_obj = ast.literal_eval(dict_str)
+        keys = list(dict_obj.keys())
+        gene_lists = [genes.split(", ") for genes in dict_obj.values()]
+        return keys, gene_lists
+    except (SyntaxError, ValueError) as e:
+        logger.error(f"Error parsing dictionary string: {e}")
+        return [], []
 
-def ontology_dict_to_tuple(dict_str):
+def ontology_dict_to_tuple(dict_str: str) -> Tuple[List[str], List[List[str]]]:
     """
     Convert an ontology dictionary string into a tuple with a list of keys and a list of lists of genes.
 
     Args:
-        dict_str (str): The ontology dictionary string to convert.
+        dict_str: The ontology dictionary string to convert
 
     Returns:
-        tuple: A tuple containing a list of keys and a list of lists of genes.
+        A tuple containing a list of keys and a list of lists of genes
     """
-    dict_obj = ast.literal_eval(dict_str)
-    keys = list(dict_obj.keys())
-    gene_lists = [genes.split(";") for genes in dict_obj.values()]
-    return keys, gene_lists
+    try:
+        dict_obj = ast.literal_eval(dict_str)
+        keys = list(dict_obj.keys())
+        gene_lists = [genes.split(";") for genes in dict_obj.values()]
+        return keys, gene_lists
+    except (SyntaxError, ValueError) as e:
+        logger.error(f"Error parsing ontology dictionary string: {e}")
+        return [], []
 
-def unique_genes_to_keys(dict_str):
+def unique_genes_to_keys(dict_str: str) -> List[str]:
     """
     Convert a unique genes dictionary string into a list of keys.
 
     Args:
-        dict_str (str): The unique genes dictionary string to convert.
+        dict_str: The unique genes dictionary string to convert
 
     Returns:
-        list: A list of keys.
+        A list of keys
     """
-    dict_obj = ast.literal_eval(dict_str)
-    return list(dict_obj.keys())
+    try:
+        dict_obj = ast.literal_eval(dict_str)
+        return list(dict_obj.keys())
+    except (SyntaxError, ValueError) as e:
+        logger.error(f"Error parsing unique genes dictionary string: {e}")
+        return []
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--df",
-        required=True,
-        help="Path to the input CSV file containing the DataFrame."
-    )
-    parser.add_argument(
-        "--save_folder",
-        default="images",
-        help="Folder where generated PNG files will be saved. Defaults to 'images'."
-    )
-    parser.add_argument(
-        "--log_file",
-        default="geneplotter.log",
-        help="Path to the log file. Defaults to 'geneplotter.log'."
-    )
-    args = parser.parse_args()
-
-    # Configure logging with timestamps and log to file
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[
-            logging.FileHandler(args.log_file),
-            logging.StreamHandler()
-        ]
-    )
-
-    os.makedirs(args.save_folder, exist_ok=True)
-
-    # Read the input DataFrame
-    df = pd.read_csv(args.df)
-
-    # Loop over each row of the DataFrame and generate a heatmap for each entry
-    for index, row in tqdm(df.iterrows(), total=len(df), desc="Generating heatmaps"):
-        query_name = row["query"]
-        png_name = query_name.replace(" ", "_") + ".png"
-        # replace special characters "/"
-        png_name = png_name.replace("/", "_")
-        savename = os.path.join(args.save_folder, png_name)
-
-        query_set = unique_genes_to_keys(row["unique_genes"])
-        ref_keys, ref_lists = dict_to_tuple(row["ref_dict"])
-        ontology_keys, ontology_lists = ontology_dict_to_tuple(row["ontology_dict"])
-
-        logging.info(f"Generating heatmap for query: {query_name}")
-
-        gp = Geneplotter()
-        gp.plot_heatmap(
-            query_set=query_set,
-            ref_sets=ref_lists,
-            ontology_sets=ontology_lists,
-            ref_labels=ref_keys,
-            ontology_labels=ontology_keys,
-            savename=savename
-        )
-
-        logging.info(f"Saved heatmap to: {savename}")
+def generate_heatmaps(df_path: str, save_folder: str, log_file: Optional[str] = None) -> None:
+    """
+    Generate heatmaps for all entries in a DataFrame.
+    
+    Args:
+        df_path: Path to the input CSV file containing the DataFrame
+        save_folder: Folder where generated PNG files will be saved
+        log_file: Path to the log file (optional)
+    """
+    # Configure logging if log_file is provided
+    if log_file:
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+        logger.addHandler(file_handler)
+    
+    # Create the save folder if it doesn't exist
+    os.makedirs(save_folder, exist_ok=True)
+    
+    try:
+        # Read the input DataFrame
+        df = pd.read_csv(df_path)
+        
+        logger.info(f"Generating heatmaps for {len(df)} entries")
+        
+        # Loop over each row of the DataFrame and generate a heatmap for each entry
+        for index, row in tqdm(df.iterrows(), total=len(df), desc="Generating heatmaps"):
+            try:
+                query_name = row["query"]
+                png_name = query_name.replace(" ", "_") + ".png"
+                # replace special characters "/"
+                png_name = png_name.replace("/", "_")
+                savename = os.path.join(save_folder, png_name)
+                
+                query_set = unique_genes_to_keys(row["unique_genes"])
+                
+                # Check if the required columns exist
+                if "ref_dict" in row and "ontology_dict" in row:
+                    ref_keys, ref_lists = dict_to_tuple(row["ref_dict"])
+                    ontology_keys, ontology_lists = ontology_dict_to_tuple(row["ontology_dict"])
+                    
+                    logger.info(f"Generating heatmap for query: {query_name}")
+                    
+                    gp = Geneplotter()
+                    gp.plot_heatmap(
+                        query_set=query_set,
+                        ref_sets=ref_lists,
+                        ontology_sets=ontology_lists,
+                        ref_labels=ref_keys,
+                        ontology_labels=ontology_keys,
+                        savename=savename
+                    )
+                    
+                    logger.info(f"Saved heatmap to: {savename}")
+                else:
+                    logger.warning(f"Skipping row {index}: Missing required columns")
+            except Exception as e:
+                logger.error(f"Error generating heatmap for row {index}: {e}")
+                continue
+        
+        logger.info(f"Completed generating {len(df)} heatmaps")
+        
+    except Exception as e:
+        logger.error(f"Error generating heatmaps: {e}")
+        import traceback
+        traceback.print_exc()

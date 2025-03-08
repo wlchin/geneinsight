@@ -1,0 +1,141 @@
+Downloads
+=========
+
+Select the themes you want to download by checking the boxes. Click "Download Selected" to get a ZIP file of the selected themes.
+
+.. raw:: html
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+
+    <script>
+    var allFiles = {theme_dict};
+
+    function updateCounter() {
+        var checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        var counter = document.getElementById('file-counter');
+        var basketContainer = document.querySelector('.basket-container');
+        var count = 0;
+
+        checkboxes.forEach(cb => {
+            var label = cb.parentElement;
+            if (cb.checked) {
+                label.style.fontWeight = 'bold';
+                count++;
+            } else {
+                label.style.fontWeight = 'normal';
+            }
+        });
+
+        if (count > 0) {
+            basketContainer.style.display = "flex";
+            counter.innerHTML = '<i class="fas fa-shopping-basket"></i> ' + count;
+        } else {
+            basketContainer.style.display = "none";
+        }
+    }
+
+    async function downloadSelected() {
+        var checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+        if (checkboxes.length === 0) return;
+
+        var zip = new JSZip();
+        var folder = zip.folder("selected_files");
+
+        for (let cb of checkboxes) {
+            // "name" is the original filename (minus `.csv`)
+            let name = cb.value;
+            let base64Data = allFiles[name];
+            let csvData = atob(base64Data);
+
+            // Remove trailing underscore before ".csv"
+            let finalName = name.endsWith("_") ? name.slice(0, -1) + ".csv" : name + ".csv";
+            let blob = new Blob([csvData], {type: 'text/csv'});
+            folder.file(finalName, blob);
+        }
+
+        zip.generateAsync({ type: "blob" }).then(function (content) {
+            let link = document.createElement("a");
+            link.href = URL.createObjectURL(content);
+            link.download = "selected_files.zip";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    }
+
+    function toggleSelectAll() {
+        var checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        var selectAllBtn = document.getElementById('select-all-btn');
+        var allSelected = Array.from(checkboxes).every(cb => cb.checked);
+
+        checkboxes.forEach(cb => cb.checked = !allSelected);
+        selectAllBtn.textContent = allSelected ? "Select All Themes" : "Deselect All Themes";
+        updateCounter();
+    }
+    </script>
+
+    <style>
+        .checkbox-group {
+            margin: 10px 0;
+        }
+        .checkbox-list {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .download-btn {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .basket-container {
+            display: none; /* Initially hidden */
+            align-items: center;
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+        }
+        .basket-icon {
+            background-color: transparent;
+            color: black;
+            padding: 8px 12px;
+            border-radius: 50%;
+            font-size: 14px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: bold;
+        }
+        .basket-icon i {
+            margin-right: 0px;
+        }
+        .basket-text {
+            margin-left: 0px; /* Move closer to the basket */
+            font-size: 14px;
+            color: black;
+        }
+        .select-all-btn {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+
+    <div class="basket-container">
+        <div id="file-counter" class="basket-icon" onclick="downloadSelected()">
+            <i class="fas fa-shopping-basket"></i> 0
+        </div>
+        <div class="basket-text">Themes selected</div>
+    </div>
+
+    <div class="checkbox-list">
+    {checkbox_rows}
+    </div>
+    <button id="select-all-btn" class="select-all-btn" onclick="toggleSelectAll()">Select All Themes</button>
+    <button class="download-btn" onclick="downloadSelected()">Download Selected</button>

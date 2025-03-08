@@ -32,6 +32,8 @@ REQUIRED = [
     'rich>=13.6.0',
     'typer>=0.9.0',
     'pyyaml>=6.0',
+    'seaborn>=0.12.0',  # Added seaborn dependency
+    'colorcet>=1.0.0',  # Added colorcet dependency
 ]
 
 # Optional packages
@@ -98,4 +100,8 @@ setup(
             'geneinsight-filter=geneinsight.scripts.geneinsight_filter:main',
         ],
     },
+    
+    package_data={
+    'topicgenes.report': ['assets/*.png'],
+    }
 )

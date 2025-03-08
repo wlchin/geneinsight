@@ -47,6 +47,11 @@ class HypergeometricGSEA:
             logger.error("gseapy package not available. Please install it.")
             return pd.DataFrame()
         
+        # Return empty DataFrame if geneset_dict is empty
+        if not geneset_dict:
+            logger.warning("No gene sets provided for GSEA analysis.")
+            return pd.DataFrame()
+        
         logger.info(f"Performing hypergeometric GSEA with {len(geneset_dict)} gene sets")
         
         try:
@@ -57,7 +62,12 @@ class HypergeometricGSEA:
                 outdir=None,
                 verbose=True
             )
-            return enr.res2d
+            # Ensure we return a DataFrame even if res2d is None
+            if hasattr(enr, 'res2d') and enr.res2d is not None:
+                return enr.res2d
+            else:
+                logger.warning("No results returned from GSEA analysis.")
+                return pd.DataFrame()
         except Exception as e:
             logger.error(f"Error in hypergeometric GSEA: {e}")
             import traceback
@@ -127,11 +137,25 @@ def hypergeometric_enrichment(
             try:
                 # Try to parse the unique_genes string as a dictionary and extract keys
                 geneset = list(ast.literal_eval(row["unique_genes"]).keys())
-                genequery[query_name] = geneset
+                if geneset:  # Only add if geneset is not empty
+                    genequery[query_name] = geneset
             except (SyntaxError, ValueError) as e:
                 logger.warning(f"Error parsing unique_genes for query {query_name}: {e}")
                 continue
         
+        if not genequery:
+            logger.warning("No valid gene sets extracted for GSEA analysis.")
+            # Create empty DataFrame with expected columns
+            empty_df = pd.DataFrame(columns=["Term", "Overlap", "P-value", "Adjusted P-value", "Genes"])
+            
+            # Save to CSV if requested
+            if output_csv:
+                os.makedirs(os.path.dirname(output_csv), exist_ok=True)
+                empty_df.to_csv(output_csv, index=False)
+                logger.info(f"Saved empty results to {output_csv}")
+                
+            return empty_df
+            
         logger.info(f"Created query dictionary with {len(genequery)} entries")
     except Exception as e:
         logger.error(f"Error processing gene sets: {e}")
@@ -141,21 +165,29 @@ def hypergeometric_enrichment(
     gsea = HypergeometricGSEA(gene_origin[0].tolist(), background_list=background_genes_list)
     result = gsea.perform_hypergeometric_gsea(genequery)
     
+    # Always ensure result is a DataFrame
+    if result is None:
+        logger.warning("GSEA returned None instead of results.")
+        result = pd.DataFrame()
+    
     if result.empty:
         logger.warning("GSEA returned no results")
-        return pd.DataFrame()
-    
-    # Filter for significant results
-    filtered_result = result[result["Adjusted P-value"] < pvalue_threshold]
-    logger.info(f"Filtered to {len(filtered_result)} significant results (p < {pvalue_threshold})")
+        # Create empty DataFrame with expected columns if needed
+        if len(result.columns) == 0:
+            result = pd.DataFrame(columns=["Term", "Overlap", "P-value", "Adjusted P-value", "Genes"])
+    else:
+        # Filter for significant results
+        filtered_result = result[result["Adjusted P-value"] < pvalue_threshold]
+        logger.info(f"Filtered to {len(filtered_result)} significant results (p < {pvalue_threshold})")
+        result = filtered_result
     
     # Save to CSV
     if output_csv:
         try:
             os.makedirs(os.path.dirname(output_csv), exist_ok=True)
-            filtered_result.to_csv(output_csv, index=False)
-            logger.info(f"Saved filtered results to {output_csv}")
+            result.to_csv(output_csv, index=False)
+            logger.info(f"Saved results to {output_csv}")
         except Exception as e:
             logger.error(f"Error saving results: {e}")
     
-    return filtered_result
+    return result

@@ -43,7 +43,7 @@ def load_csv_data(file_path: str) -> List[str]:
 
 def initialize_bertopic(
     documents: List[str], 
-    num_topics: Optional[int] = 10, 
+    num_topics: Optional[int] = None, 
     embeddings: Optional[List] = None
 ) -> Tuple[BERTopic, List[int], List[float]]:
     """

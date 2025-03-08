@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONFIG = {
     "n_samples": 5,
     "num_topics": 10,
-    "pvalue_threshold": 0.01,
+    "pvalue_threshold": 0.05,
     "api_service": "openai",
     "api_model": "gpt-4o-mini",
     "api_parallel_jobs": 4,

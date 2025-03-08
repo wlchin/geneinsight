@@ -147,9 +147,15 @@ class Pipeline:
         logger.info("Step 8: Extracting key topics")
         key_topics_df = self._get_key_topics(topics_df)
         
-        # 9. Filter topics by similarity
+        # 9. Filter topics by similarity using key topics
         logger.info("Step 9: Filtering topics by similarity")
         filtered_df = self._filter_topics(key_topics_df)
+        
+        # If the filtered DataFrame has fewer than the target rows (default: 25), 
+        # then use the entire enriched DataFrame as input for filtering and clustering.
+        if len(filtered_df) < self.target_filtered_topics:
+            logger.info("Filtered topics fewer than target; using entire enriched dataframe for filtering and clustering.")
+            filtered_df = self._filter_topics(enriched_df)
         
         # 9b. Run clustering on the filtered topics
         logger.info("Step 9b: Clustering filtered topics")
@@ -334,16 +340,17 @@ class Pipeline:
             output_file=key_topics_output,
             top_n=None  # Get all topics
         )
+        logger.info(f"Found {len(key_topics_df)} key topics")
         
         return key_topics_df
     
-    def _filter_topics(self, key_topics_df: pd.DataFrame) -> pd.DataFrame:
+    def _filter_topics(self, input_df: pd.DataFrame) -> pd.DataFrame:
         """Filter topics by similarity."""
         from .analysis.similarity import filter_terms_by_similarity
         
+        # Always write the provided input DataFrame to file
         key_topics_file = os.path.join(self.dirs["key_topics"], "key_topics.csv")
-        if not os.path.exists(key_topics_file):
-            key_topics_df.to_csv(key_topics_file, index=False)
+        input_df.to_csv(key_topics_file, index=False)
         
         filtered_output = os.path.join(self.dirs["filtered_sets"], "filtered.csv")
         

@@ -1,10 +1,10 @@
-# TopicGenes
+# Geneinsight
 
 A Python package for topic modeling of gene sets with enrichment analysis. 
 
 ## Overview
 
-TopicGenes provides a comprehensive pipeline for analyzing gene sets through topic modeling and enrichment analysis:
+Geneinsight provides a comprehensive pipeline for analyzing gene sets through topic modeling and enrichment analysis:
 
 1. **Gene Enrichment**: Query StringDB for gene enrichment data
 2. **Topic Modeling**: Apply BERTopic to identify themes in gene sets
@@ -17,14 +17,14 @@ TopicGenes provides a comprehensive pipeline for analyzing gene sets through top
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/topicgenes.git
-cd topicgenes
+git clone https://github.com/yourusername/geneinsight.git
+cd geneinsight
 
 # Install the package
 pip install -e .
 
 # Or install directly from GitHub
-pip install git+https://github.com/yourusername/topicgenes.git
+pip install git+https://github.com/yourusername/geneinsight.git
 ```
 
 ## Quick Start
@@ -33,10 +33,10 @@ Run the pipeline on your gene sets:
 
 ```bash
 # Basic usage
-topicgenes query_genes.txt background_genes.txt -o ./output
+geneinsight query_genes.txt background_genes.txt -o ./output
 
 # Advanced usage with custom parameters
-topicgenes query_genes.txt background_genes.txt \
+geneinsight query_genes.txt background_genes.txt \
   --n-samples 5 \
   --num-topics 10 \
   --pvalue-threshold 0.01 \
@@ -47,7 +47,7 @@ topicgenes query_genes.txt background_genes.txt \
 ## Command Line Interface
 
 ```
-usage: topicgenes [-h] [-o OUTPUT_DIR] [-t TEMP_DIR] [-n N_SAMPLES]
+usage: geneinsight [-h] [-o OUTPUT_DIR] [-t TEMP_DIR] [-n N_SAMPLES]
                   [-k NUM_TOPICS] [-p PVALUE_THRESHOLD] [--api-service API_SERVICE]
                   [--api-model API_MODEL] [--api-parallel-jobs API_PARALLEL_JOBS]
                   [--api-base-url API_BASE_URL]
@@ -55,7 +55,7 @@ usage: topicgenes [-h] [-o OUTPUT_DIR] [-t TEMP_DIR] [-n N_SAMPLES]
                   [-c CONFIG] [-v]
                   query_gene_set background_gene_list
 
-TopicGenes: Topic modeling pipeline for gene sets with enrichment analysis
+Geneinsight: Topic modeling pipeline for gene sets with enrichment analysis
 
 positional arguments:
   query_gene_set        Path to file containing query gene set
@@ -108,7 +108,7 @@ target_filtered_topics: 20
 Then use it with:
 
 ```bash
-topicgenes query_genes.txt background_genes.txt --config config.yaml
+geneinsight query_genes.txt background_genes.txt --config config.yaml
 ```
 
 ## Environment Variables
@@ -141,7 +141,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Command Line Interface
 
 ```
-usage: topicgenes [-h] [-o OUTPUT_DIR] [-t TEMP_DIR] [-n N_SAMPLES]
+usage: geneinsight [-h] [-o OUTPUT_DIR] [-t TEMP_DIR] [-n N_SAMPLES]
                   [-k NUM_TOPICS] [-p PVALUE_THRESHOLD] [--api-service API_SERVICE]
                   [--api-model API_MODEL] [--api-parallel-jobs API_PARALLEL_JOBS]
                   [--api-base-url API_BASE_URL]
@@ -149,7 +149,7 @@ usage: topicgenes [-h] [-o OUTPUT_DIR] [-t TEMP_DIR] [-n N_SAMPLES]
                   [-c CONFIG] [-v]
                   query_gene_set background_gene_list
 
-TopicGenes: Topic modeling pipeline for gene sets with enrichment analysis
+Geneinsight: Topic modeling pipeline for gene sets with enrichment analysis
 
 positional arguments:
   query_gene_set        Path to file containing query gene set
@@ -185,36 +185,36 @@ options:
 
 ## Running Individual Steps
 
-TopicGenes also provides individual command-line tools for running each step of the pipeline separately:
+Geneinsight also provides individual command-line tools for running each step of the pipeline separately:
 
 ### 1. StringDB Enrichment
 ```bash
-topicgenes-enrichment gene_list.txt -o ./output -m single
+geneinsight-enrichment gene_list.txt -o ./output -m single
 ```
 
 ### 2. Topic Modeling
 ```bash
-topicgenes-topic ./output/gene_list__documents.csv -o ./output/topics.csv -n 5 -k 10
+geneinsight-topic ./output/gene_list__documents.csv -o ./output/topics.csv -n 5 -k 10
 ```
 
 ### 3. Prompt Generation
 ```bash
-topicgenes-prompt ./output/topics.csv -o ./output/prompts.csv -n 5 -w 10
+geneinsight-prompt ./output/topics.csv -o ./output/prompts.csv -n 5 -w 10
 ```
 
 ### 4. API Processing
 ```bash
-topicgenes-api ./output/prompts.csv -o ./output/api_results.csv --service openai --model gpt-4o-mini
+geneinsight-api ./output/prompts.csv -o ./output/api_results.csv --service openai --model gpt-4o-mini
 ```
 
 ### 5. Hypergeometric Enrichment
 ```bash
-topicgenes-hypergeometric ./output/api_results.csv gene_list.txt background_genes.txt -o ./output/enriched.csv -p 0.01
+geneinsight-hypergeometric ./output/api_results.csv gene_list.txt background_genes.txt -o ./output/enriched.csv -p 0.01
 ```
 
 ### 6. Topic Filtering
 ```bash
-topicgenes-filter ./output/enriched.csv -o ./output/filtered_topics.csv -t 25
+geneinsight-filter ./output/enriched.csv -o ./output/filtered_topics.csv -t 25
 ```
 
 This modular approach gives you complete control over the pipeline and allows you to:
@@ -222,3 +222,51 @@ This modular approach gives you complete control over the pipeline and allows yo
 - Resume processing from any point if a step fails
 - Run only the specific steps you need
 - Integrate individual steps into your own workflows
+
+## Output Format
+
+The pipeline produces a zip file containing:
+
+- `enrichment.csv`: Gene enrichment data from StringDB
+- `documents.csv`: Document descriptions for topic modeling
+- `topics.csv`: Topic modeling results
+- `prompts.csv`: Generated prompts for API
+- `api_results.csv`: Results from API calls
+- `summary.csv`: Summary of topic modeling and enrichment
+- `enriched.csv`: Hypergeometric enrichment results
+- `filtered.csv`: Final filtered topics
+- `metadata.csv`: Run information and parameters
+
+## Interactive Report Generation
+
+TopicGenes can generate an interactive HTML report visualizing the results using the `topicgenes-report` command:
+
+```bash
+# Generate a report from pipeline results
+topicgenes-report ./output -o ./report
+
+# With custom title and logo
+topicgenes-report ./output -o ./report --title "My Gene Analysis" --logo logo.png
+```
+
+The report includes:
+
+1. **Interactive Topic Map** - A 2D visualization showing relationships between topics
+2. **Theme Pages** - Detailed pages for each identified theme
+3. **Gene Set Visualizations** - Heatmaps showing gene presence across references
+4. **Summary Statistics** - Key metrics about the analysis
+5. **Download Interface** - Interactive interface to download specific themes
+
+To view the report, open `report/html/build/html/index.html` in your web browser.
+
+### Report Dependencies
+
+The report generation requires additional dependencies:
+
+```bash
+pip install umap-learn plotly colorcet sphinx sphinx-rtd-theme pillow
+```
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

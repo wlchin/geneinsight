@@ -39,3 +39,4 @@ pillow>=9.0.0
 stringdb==0.1.5
 ollama==0.28.1
 sphinx-wagtail-theme==6.5.0
+sphinx-togglebutton==0.3.2

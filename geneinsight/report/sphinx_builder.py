@@ -1,36 +1,138 @@
+#!/usr/bin/env python3
 """
 Sphinx Builder Module for GeneInsight
 
 This module handles building Sphinx documentation from the generated RST files.
+It can be imported as a library (using build_sphinx_docs) or run as a standalone script.
 """
 
 import os
 import glob
 import shutil
 import subprocess
+import argparse
 import logging
 
-def build_sphinx_docs(rst_folder, image_folder, output_folder, log_path, 
-                      html_embedding_path, logo_path):
+def append_line_to_file(file_path, line):
+    """
+    Append a line to the end of the specified file.
+    
+    Args:
+        file_path (str): The path to the file.
+        line (str): The line to append.
+    """
+    with open(file_path, 'a') as file:
+        file.write(f"{line}\n")
+
+def generate_index_rst(source_dir):
+    """
+    Generate the index.rst file for the Sphinx documentation.
+    
+    This version uses the logic from the second script: it collects all .rst files
+    in the source directory (excluding index.rst, summary.rst, and download.rst) and
+    builds a toctree.
+    
+    Args:
+        source_dir (str): Source directory of the Sphinx project.
+    """
+    logging.info("Identifying .rst files for index.rst generation...")
+    # Find all .rst files in the source directory.
+    rst_files = sorted(glob.glob(os.path.join(source_dir, "*.rst")))
+    # Exclude specific files.
+    rst_files = [f for f in rst_files if os.path.basename(f) not in ["index.rst", "summary.rst", "download.rst"]]
+    # Get file names without the .rst extension.
+    doc_files = [os.path.basename(f).replace(".rst", "") for f in rst_files]
+    logging.info(f"Found the following document files: {doc_files}")
+
+    index_content = [
+        "GeneInsight Topic Descriptions\n",
+        "==================================\n\n",
+        ".. toctree::\n",
+        "   :maxdepth: 1\n",
+        "   :caption: Major themes:\n",
+        "\n",
+    ]
+    for doc in doc_files:
+        index_content.append(f"   {doc}\n")
+    
+    # Append a metadata section.
+    metadata_content = """
+.. toctree::
+   :maxdepth: 1
+   :caption: Metadata:
+
+   summary
+   download
+"""
+    index_content.append(metadata_content)
+    
+    index_path = os.path.join(source_dir, "index.rst")
+    with open(index_path, "w") as f:
+        f.writelines(index_content)
+    
+    logging.info(f"Generated index.rst at {index_path}")
+
+def update_conf_py(source_dir, logo_path):
+    """
+    Update the conf.py file by appending Sphinx theme and extension settings.
+    
+    This version uses the line-appending method from the second script.
+    
+    Args:
+        source_dir (str): Source directory of the Sphinx project.
+        logo_path (str): Full path to the logo image.
+    """
+    logging.info("Appending theme and extension settings to conf.py...")
+    conf_file_path = os.path.join(source_dir, "conf.py")
+    
+    # Append new configuration settings.
+    append_line_to_file(conf_file_path, "\n")
+    append_line_to_file(conf_file_path, "html_theme = 'sphinx_wagtail_theme'")
+    append_line_to_file(conf_file_path, "extensions = ['sphinx_wagtail_theme', 'sphinx_togglebutton']")
+    append_line_to_file(conf_file_path, "html_theme_options = dict(")
+    append_line_to_file(conf_file_path, "    project_name = \"GeneInsight\",")
+    append_line_to_file(conf_file_path, "    footer_links = \",\".join([")
+    append_line_to_file(conf_file_path, "        \"Contact|http://example.com/contact\",")
+    append_line_to_file(conf_file_path, "        \"Developers|http://example.com/dev/null\",")
+    append_line_to_file(conf_file_path, "    ]),")
+    append_line_to_file(conf_file_path, f"    logo = \"{os.path.basename(logo_path)}\",")
+    append_line_to_file(conf_file_path, "    logo_alt = \"GeneInsight\",")
+    append_line_to_file(conf_file_path, "    logo_height = 59,")
+    append_line_to_file(conf_file_path, "    logo_url = \"/\",")
+    append_line_to_file(conf_file_path, "    logo_width = 45,")
+    append_line_to_file(conf_file_path, ")")
+    append_line_to_file(conf_file_path, "html_show_copyright = False")
+    append_line_to_file(conf_file_path, "html_show_sphinx = False")
+    
+    logging.info(f"Updated conf.py at {conf_file_path}")
+
+def build_sphinx_docs(rst_folder, image_folder, output_folder, log_path, html_embedding_path, logo_path):
     """
     Build Sphinx documentation from RST files.
     
+    This function creates a new Sphinx project, copies over RST and image files,
+    embeds the given HTML file, generates an index.rst, updates conf.py, and builds
+    the HTML documentation.
+    
     Args:
-        rst_folder (str): Folder containing RST files
-        image_folder (str): Folder containing image files
-        output_folder (str): Folder to save the Sphinx build
-        log_path (str): Path to save the log file
-        html_embedding_path (str): Path to the HTML file to embed
-        logo_path (str): Path to the logo image
+        rst_folder (str): Folder containing RST files.
+        image_folder (str): Folder containing image files.
+        output_folder (str): Folder to save the Sphinx build (project directory).
+        log_path (str): Path to save the log file.
+        html_embedding_path (str): Path to the HTML file to embed.
+        logo_path (str): Path to the logo image.
+    
+    Returns:
+        bool: True if build succeeded, False otherwise.
     """
-    logging.info(f"Building Sphinx documentation")
+    logging.info("Starting Sphinx documentation build process...")
     
     try:
-        # Create output folder if it doesn't exist
+        # Ensure the output (project) folder exists.
         os.makedirs(output_folder, exist_ok=True)
         
-        # Create a new Sphinx project
-        result = subprocess.run([
+        # Create a new Sphinx project in quiet mode.
+        subprocess.run([
             "sphinx-quickstart",
             output_folder,
             "--quiet",
@@ -38,41 +140,38 @@ def build_sphinx_docs(rst_folder, image_folder, output_folder, log_path,
             "--author", "",
             "--sep",
         ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        
         logging.info(f"Created Sphinx project in {output_folder}")
         
-        # Copy RST files to the source directory
+        # Define the source directory.
         source_docs_dir = os.path.join(output_folder, "source")
+        
+        # Copy RST files.
         for rst_file in glob.glob(os.path.join(rst_folder, "*.*")):
-            shutil.copy2(rst_file, source_docs_dir)
+            shutil.copy(rst_file, source_docs_dir)
+        logging.info(f"Copied RST files from {rst_folder} to {source_docs_dir}")
         
-        logging.info(f"Copied RST files to {source_docs_dir}")
-        
-        # Copy image files
+        # Copy image files.
         for img_file in glob.glob(os.path.join(image_folder, "*.*")):
-            shutil.copy2(img_file, source_docs_dir)
+            shutil.copy(img_file, source_docs_dir)
+        logging.info(f"Copied image files from {image_folder} to {source_docs_dir}")
         
-        logging.info(f"Copied image files to {source_docs_dir}")
+        # Copy the HTML embedding file.
+        shutil.copy(html_embedding_path, source_docs_dir)
+        logging.info(f"Copied HTML embedding file from {html_embedding_path} to {source_docs_dir}")
         
-        # Copy the HTML embedding file
-        shutil.copy2(html_embedding_path, source_docs_dir)
-        
-        logging.info(f"Copied HTML embedding file to {source_docs_dir}")
-        
-        # Create _static directory and copy logo
+        # Copy the logo image into the _static folder.
         static_dir = os.path.join(source_docs_dir, "_static")
         os.makedirs(static_dir, exist_ok=True)
-        shutil.copy2(logo_path, static_dir)
+        shutil.copy(logo_path, static_dir)
+        logging.info(f"Copied logo from {logo_path} to {static_dir}")
         
-        logging.info(f"Copied logo to {static_dir}")
-        
-        # Generate the index.rst file
+        # Generate index.rst with the updated logic.
         generate_index_rst(source_docs_dir)
         
-        # Update conf.py
-        update_conf_py(source_docs_dir, os.path.basename(logo_path))
+        # Update conf.py with additional configuration.
+        update_conf_py(source_docs_dir, logo_path)
         
-        # Build the HTML documentation
+        # Build the HTML documentation.
         build_dir = os.path.join(output_folder, "build", "html")
         result = subprocess.run([
             "sphinx-build",
@@ -81,7 +180,7 @@ def build_sphinx_docs(rst_folder, image_folder, output_folder, log_path,
             build_dir,
         ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
-        # Save the output to the log file
+        # Write the build output to the log file.
         with open(log_path, 'w') as f:
             f.write(result.stdout.decode())
             f.write("\n\n")
@@ -94,8 +193,6 @@ def build_sphinx_docs(rst_folder, image_folder, output_folder, log_path,
     
     except subprocess.CalledProcessError as e:
         logging.error(f"Error building Sphinx documentation: {e}")
-        
-        # Save the error to the log file
         with open(log_path, 'w') as f:
             f.write(f"Error: {str(e)}\n")
             if e.stdout:
@@ -104,125 +201,53 @@ def build_sphinx_docs(rst_folder, image_folder, output_folder, log_path,
             if e.stderr:
                 f.write("\nSTDERR:\n")
                 f.write(e.stderr.decode())
-        
         return False
     
     except Exception as e:
         logging.error(f"Error building Sphinx documentation: {e}")
-        
-        # Save the error to the log file
         with open(log_path, 'w') as f:
             f.write(f"Error: {str(e)}\n")
-        
         return False
 
-def generate_index_rst(source_dir):
+def main():
     """
-    Generate the index.rst file for the Sphinx documentation.
-    
-    Args:
-        source_dir (str): Source directory of the Sphinx project
+    Parse command-line arguments and run the Sphinx documentation build.
     """
-    logging.info(f"Generating index.rst")
+    parser = argparse.ArgumentParser(
+        description="Create and build a Sphinx documentation project for GeneInsight."
+    )
+    parser.add_argument("--rst_folder", required=True, help="Folder containing RST files")
+    parser.add_argument("--image_folder", required=True, help="Folder containing image files")
+    parser.add_argument("--output_folder", required=True, help="Folder to create the Sphinx project")
+    parser.add_argument("--log_path", default="sphinx_build.log", help="Path to the log file (default: sphinx_build.log)")
+    parser.add_argument("--html_embedding_path", required=True, help="Path to the HTML file to embed")
+    parser.add_argument("--logo_path", required=True, help="Path to the logo image")
+    args = parser.parse_args()
     
-    # Identify doc*.rst files
-    doc_files = sorted(glob.glob(os.path.join(source_dir, "cluster_*.rst")))
-    doc_files = [os.path.basename(doc).replace(".rst", "") for doc in doc_files]
+    # Configure logging to print timestamps to both console and log file.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[
+            logging.FileHandler(args.log_path),
+            logging.StreamHandler()
+        ]
+    )
     
-    # Create index content
-    index_content = [
-        "GeneInsight Topic Descriptions\n",
-        "==================================\n\n",
-        ".. toctree::\n",
-        "   :maxdepth: 1\n",
-        "   :caption: Major themes:\n",
-        "\n",
-    ]
+    success = build_sphinx_docs(
+        args.rst_folder,
+        args.image_folder,
+        args.output_folder,
+        args.log_path,
+        args.html_embedding_path,
+        args.logo_path
+    )
     
-    # Add each cluster file to the toctree
-    for doc in doc_files:
-        index_content.append(f"   {doc}\n")
-    
-    # Add metadata section
-    metadata_content = """
-.. toctree::
-   :maxdepth: 1
-   :caption: Metadata:
+    if not success:
+        logging.error("Sphinx documentation build failed.")
+        exit(1)
+    else:
+        logging.info("Sphinx documentation build completed successfully.")
 
-   summary
-   download
-"""
-    index_content.append(metadata_content)
-    
-    # Write the index.rst file
-    index_path = os.path.join(source_dir, "index.rst")
-    with open(index_path, "w") as f:
-        f.writelines(index_content)
-    
-    logging.info(f"Generated index.rst at {index_path}")
-
-def update_conf_py(source_dir, logo_filename):
-    """
-    Update the conf.py file with theme and extension settings.
-    
-    Args:
-        source_dir (str): Source directory of the Sphinx project
-        logo_filename (str): Filename of the logo image
-    """
-    logging.info(f"Updating conf.py")
-    
-    conf_path = os.path.join(source_dir, "conf.py")
-    
-    # Read the original content
-    with open(conf_path, "r") as f:
-        content = f.read()
-    
-    # Add theme and extensions
-    additional_content = f"""
-# Theme configuration
-html_theme = 'sphinx_rtd_theme'  # Using ReadTheDocs theme as fallback if wagtail not available
-try:
-    import sphinx_wagtail_theme
-    html_theme = 'sphinx_wagtail_theme'
-except ImportError:
-    pass
-
-# Extensions
-extensions = []
-try:
-    import sphinx_wagtail_theme
-    extensions.append('sphinx_wagtail_theme')
-except ImportError:
-    pass
-
-try:
-    import sphinx_togglebutton
-    extensions.append('sphinx_togglebutton')
-except ImportError:
-    pass
-
-# Theme options
-html_theme_options = dict(
-    project_name = "GenesetInsight",
-    footer_links = ",".join([
-        "Contact|http://example.com/contact",
-        "Developers|http://example.com/dev/null",
-    ]),
-    logo = "{logo_filename}",
-    logo_alt = "GenesetInsight",
-    logo_height = 59,
-    logo_url = "/",
-    logo_width = 45,
-)
-
-# Other settings
-html_show_copyright = False
-html_show_sphinx = False
-"""
-    
-    # Write the updated content
-    with open(conf_path, "w") as f:
-        f.write(content)
-        f.write(additional_content)
-    
-    logging.info(f"Updated conf.py at {conf_path}")
+if __name__ == "__main__":
+    main()

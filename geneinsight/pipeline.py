@@ -102,7 +102,7 @@ class Pipeline:
         self,
         query_gene_set: str,
         background_gene_list: str,
-        zip_output: bool = True,
+        zip_output: bool = False,
         generate_report: bool = False,
         report_dir: Optional[str] = None,
         report_title: Optional[str] = None,
@@ -212,7 +212,7 @@ class Pipeline:
                 report_output = self._generate_report(
                     output_path=output_path,
                     query_gene_set=query_gene_set,
-                    report_dir=report_dir,
+                    report_dir=output_path,
                     report_title=report_title
                 )
                 if report_output:
@@ -454,128 +454,68 @@ class Pipeline:
         report_title: Optional[str] = None,
     ) -> Optional[str]:
         """
-        Generate an HTML report from the pipeline results.
-        
+        Generate an HTML report using geneinsight.reports.pipeline.run_pipeline.
+
         Args:
             output_path: Path to the pipeline output (directory or zip file)
-            query_gene_set: Path to the query gene set file (for deriving title if needed)
-            report_dir: Directory to store the generated report (uses temp dir if None)
-            report_title: Title for the generated report (derived from gene set name if None)
-            
+            query_gene_set: Path to the query gene set file (used to derive the gene set name)
+            report_dir: Directory to store the generated report (if None, uses self.dirs["report"])
+            report_title: (Unused) Title for the report generation process
+
         Returns:
-            Path to the generated report directory, or None if generation failed
+            Path to the generated Sphinx HTML index, or None if generation failed.
         """
-        logger.info("Generating HTML report...")
-        
-        # Import here to avoid importing unless needed
-        try:
-            from .scripts.geneinsight_report import generate_report
-        except ImportError as e:
-            logger.error(f"Could not generate report: {e}")
-            logger.error("Make sure you have installed the report generation dependencies:")
-            logger.error("pip install umap-learn plotly colorcet sphinx sphinx-rtd-theme pillow")
-            return None
-        
-        # Use the report directory in the temp dir if none specified
-        if not report_dir:
-            report_dir = self.dirs["report"]
+        logger.info("Generating HTML report using geneinsight.reports.pipeline.run_pipeline...")
+
+        # Derive gene set name from the query_gene_set file name.
+        gene_set = os.path.splitext(os.path.basename(query_gene_set))[0]
+
+        # Set report output folder.
+        if report_dir is None:
+            report_out_dir = self.dirs["report"]
         else:
-            report_dir = os.path.abspath(report_dir)
-        
-        # Ensure report directory exists
-        os.makedirs(report_dir, exist_ok=True)
-        logger.info(f"Report will be generated in: {report_dir}")
-        
-        # Derive report title from gene set name if not provided
-        if not report_title:
-            gene_set_name = os.path.splitext(os.path.basename(query_gene_set))[0]
-            report_title = f"TopicGenes Analysis: {gene_set_name}"
-        
-        logger.info(f"Report title: {report_title}")
-        
-        # Prepare results directory
-        results_dir = output_path
-        extract_dir = None
-        
-        # Log the current state of directories
-        logger.info(f"Results directory to be used for report: {results_dir}")
-        logger.info(f"Checking if results directory exists: {os.path.exists(results_dir)}")
-        
-        if os.path.exists(results_dir):
-            logger.info(f"Contents of results directory:")
-            for root, dirs, files in os.walk(results_dir):
-                rel_path = os.path.relpath(root, results_dir)
-                if rel_path == '.':
-                    logger.info(f"Root directory files: {files}")
-                else:
-                    logger.info(f"Subdirectory {rel_path}: {files}")
-        
-        # Handle ZIP files - extract to temporary location within our temp directory
+            report_out_dir = os.path.abspath(report_dir)
+            os.makedirs(report_out_dir, exist_ok=True)
+
+        # Determine the input folder for the report generation.
+        # If output_path is a zip file, extract it first.
         if os.path.isfile(output_path) and output_path.endswith('.zip'):
-            import zipfile
-            
-            # Create a temporary directory for extracted files within our temp dir
-            extract_dir = os.path.join(self.temp_dir, "extracted_results")
+            import zipfile, shutil
+            extract_dir = os.path.join(self.temp_dir, "extracted_report")
+            if os.path.exists(extract_dir):
+                shutil.rmtree(extract_dir)
             os.makedirs(extract_dir, exist_ok=True)
-            logger.info(f"Created temporary extraction directory: {extract_dir}")
-            
-            # Extract the zip file
-            logger.info(f"Extracting results from {output_path} for report generation...")
+            logger.info(f"Extracting report files from zip: {output_path} to {extract_dir}")
             with zipfile.ZipFile(output_path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
-                logger.info(f"Extracted files: {os.listdir(extract_dir)}")
-            
-            # Look for the results directory within the extracted files
-            extracted_dirs = [d for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))]
-            if "results" in extracted_dirs:
-                # If there's a results directory, use that
-                results_dir = os.path.join(extract_dir, "results")
-                logger.info(f"Using extracted results directory: {results_dir}")
-            else:
-                # Otherwise use the whole extraction directory
-                results_dir = extract_dir
-                logger.info(f"Using entire extraction directory: {results_dir}")
+            input_folder = extract_dir
         elif os.path.isdir(output_path):
-            # If output_path is a directory, check for a results directory inside it
-            if os.path.exists(os.path.join(output_path, "results")):
-                results_dir = os.path.join(output_path, "results")
-                logger.info(f"Using results subdirectory: {results_dir}")
-        
+            input_folder = output_path
+        else:
+            logger.error("Output path for report generation is not valid.")
+            return None
+
+        # Import and call the run_pipeline function from geneinsight.reports.pipeline.
         try:
-            # Generate the report with debug logging enabled
-            logger.info(f"Calling generate_report with results_dir={results_dir}, output_dir={report_dir}")
-            report_path = generate_report(
-                results_dir=results_dir,
-                output_dir=report_dir,
-                title=report_title,
-                cleanup=False  # Set to False for debugging to keep temporary files
-            )
-            
-            if report_path:
-                index_html = os.path.join(report_path, 'html/build/html/index.html')
-                logger.info(f"Report generated successfully")
-                logger.info(f"Open {index_html} in a web browser to view")
-                return report_path
-            else:
-                logger.error("Report generation failed")
-                return None
-                    
-        finally:
-            # Clean up the temporary extraction directory if we created one
-            if extract_dir and os.path.exists(extract_dir):
-                logger.info("Cleaning up temporary extracted files...")
-                try:
-                    import shutil
-                    shutil.rmtree(extract_dir)
-                    logger.info("Temporary extraction directory cleaned up successfully")
-                except Exception as e:
-                    logger.warning(f"Error cleaning up temporary extraction directory: {e}")
+            from .report import pipeline as reports_pipeline
+        except ImportError as e:
+            logger.error(f"Failed to import geneinsight.reports.pipeline: {e}")
+            return None
+
+        # Call the report generation pipeline.
+        status, html_index = reports_pipeline.run_pipeline(input_folder, report_out_dir, gene_set)
+        if status and html_index:
+            logger.info(f"Report generated successfully at {html_index}")
+            return html_index
+        else:
+            logger.error("Report generation failed.")
+            return None
     
     def _finalize_outputs(
         self,
         run_id: str,
         dataframes: Dict[str, pd.DataFrame],
-        zip_output: bool = True
+        zip_output: bool = False
     ) -> str:
         """
         Finalize outputs by copying to the output directory and optionally zipping.

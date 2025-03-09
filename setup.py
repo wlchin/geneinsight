@@ -34,6 +34,7 @@ REQUIRED = [
     'pyyaml>=6.0',
     'seaborn>=0.12.0',  # Added seaborn dependency
     'colorcet>=1.0.0',  # Added colorcet dependency
+    'torch>=1.7.0',  # Needed for sentence-transformers in ontology module
 ]
 
 # Optional packages
@@ -101,10 +102,12 @@ setup(
             'geneinsight-meta=geneinsight.scripts.geneinsight_meta:main',
             'geneinsight-counter=geneinsight.scripts.geneinsight_counter:main',
             'geneinsight-report=geneinsight.scripts.geneinsight_report_pipeline:main',
+            'geneinsight-ontology=geneinsight.ontology.workflow:main'
         ],
     },
 
     package_data={
-    'topicgenes.report': ['assets/*.png'],
+        'topicgenes.report': ['assets/*.png'],
+        'geneinsight.ontology.ontology_folders': ['*.txt'],  # Include all .txt files in ontology_folders
     }
 )

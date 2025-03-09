@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 import pandas as pd
 from typing import List, Dict, Any, Optional, Union
+from geneinsight.ontology.workflow import OntologyWorkflow
 
 # Configure logging
 logging.basicConfig(
@@ -175,7 +176,18 @@ class Pipeline:
             # 9b. Run clustering on the filtered topics
             logger.info("Step 9b: Clustering filtered topics")
             clustered_df = self._run_clustering(filtered_df)
+
+               # 9c. Perform ontology enrichment analysis
+            logger.info("Step 9c: Performing ontology enrichment analysis")
+            ontology_dict_df = self._perform_ontology_enrichment(
+                summary_df=summary_df,
+                clustered_df=clustered_df,
+                query_gene_set=query_gene_set,
+                background_gene_list=background_gene_list
+            )
             
+            # Add ontology_dict_df to the finalize_outputs call
+            # Update your _finalize_outputs call in Step 10 to include the ontology dictionary:
             # 10. Finalize outputs and cleanup
             logger.info("Step 10: Finalizing outputs")
             output_path = self._finalize_outputs(
@@ -190,6 +202,7 @@ class Pipeline:
                     "enriched": enriched_df,
                     "key_topics": key_topics_df,
                     "clustered": clustered_df,
+                    "ontology_dict": ontology_dict_df,  # Add this line
                 },
                 zip_output
             )
@@ -605,6 +618,55 @@ class Pipeline:
             return zip_path
         
         return run_dir
+
+def _perform_ontology_enrichment(
+    self, 
+    summary_df: pd.DataFrame,
+    clustered_df: pd.DataFrame,
+    query_gene_set: str,
+    background_gene_list: str
+) -> pd.DataFrame:
+    """
+    Perform ontology enrichment analysis using the ontology workflow.
+    
+    Args:
+        summary_df: DataFrame containing gene summary information
+        clustered_df: DataFrame containing clustered topics
+        query_gene_set: Path to the query gene set file
+        background_gene_list: Path to the background genes file
+        
+    Returns:
+        DataFrame containing the ontology dictionary
+    """
+    logger.info("Running ontology enrichment analysis")
+    
+    # Initialize the ontology workflow
+    ontology_folder = os.path.join(os.path.dirname(__file__), "ontology", "ontology_folders")
+    workflow = OntologyWorkflow(
+        ontology_folder=ontology_folder,
+        fdr_threshold=self.pvalue_threshold,
+        use_temp_files=False  # Process dataframes in memory
+    )
+    
+    # Create output directory for ontology results
+    ontology_output_dir = os.path.join(self.dirs["final"], "ontology")
+    os.makedirs(ontology_output_dir, exist_ok=True)
+    
+    # Process dataframes directly
+    enrichment_df, ontology_dict_df = workflow.process_dataframes(
+        summary_df=summary_df,
+        clustered_df=clustered_df,
+        gene_list_path=query_gene_set,
+        background_genes_path=background_gene_list,
+        output_dir=ontology_output_dir
+    )
+    
+    # Log information about the results
+    logger.info(f"Ontology enrichment complete. Found {len(ontology_dict_df)} ontology dictionaries.")
+    
+    return ontology_dict_df
+
+
 
 if __name__ == "__main__":
     import argparse

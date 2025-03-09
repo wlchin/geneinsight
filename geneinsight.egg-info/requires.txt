@@ -14,6 +14,9 @@ pydantic>=2.4.0
 rich>=13.6.0
 typer>=0.9.0
 pyyaml>=6.0
+seaborn>=0.12.0
+colorcet>=1.0.0
+torch>=1.7.0
 
 [dev]
 pytest>=7.3.1

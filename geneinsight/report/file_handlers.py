@@ -126,14 +126,24 @@ def copy_input_files(input_folder, output_folder, gene_set):
 
 def copy_logo(output_folder):
     """Copy logo file to data directory or create a placeholder."""
+    import os
+    import shutil
+    import logging
+
     data_dir = os.path.join(output_folder, "data")
     os.makedirs(data_dir, exist_ok=True)
     logo_path = os.path.join(data_dir, "GeneInsight.png")
     
-    # First check if logo exists in the package
-    import geneinsight
-    package_dir = os.path.dirname(os.path.abspath(geneinsight.__file__))
-    package_logo_path = os.path.join(package_dir, "data", "GeneInsight.png")
+    try:
+        # Attempt to import the new location of the logo
+        import geneinsight.report.assets
+        package_dir = os.path.dirname(os.path.abspath(geneinsight.report.assets.__file__))
+        package_logo_path = os.path.join(package_dir, "logo.png")
+    except ImportError:
+        # Fallback to the original package location if the new one is not available
+        import geneinsight
+        package_dir = os.path.dirname(os.path.abspath(geneinsight.__file__))
+        package_logo_path = os.path.join(package_dir, "data", "GeneInsight.png")
     
     if os.path.exists(package_logo_path):
         shutil.copy2(package_logo_path, logo_path)

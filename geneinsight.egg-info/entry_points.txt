@@ -1,2 +1,12 @@
 [console_scripts]
-topicgenes = topicgenes.cli:main
+geneinsight = geneinsight.cli:main
+geneinsight-api = geneinsight.scripts.geneinsight_api_process:main
+geneinsight-counter = geneinsight.scripts.geneinsight_counter:main
+geneinsight-enrichment = geneinsight.scripts.geneinsight_enrichment:main
+geneinsight-filter = geneinsight.scripts.geneinsight_filter:main
+geneinsight-hypergeometric = geneinsight.scripts.geneinsight_hypergeometric:main
+geneinsight-meta = geneinsight.scripts.geneinsight_meta:main
+geneinsight-ontology = geneinsight.ontology.workflow:main
+geneinsight-prompt = geneinsight.scripts.geneinsight_prompt_gen:main
+geneinsight-report = geneinsight.scripts.geneinsight_report_pipeline:main
+geneinsight-topic = geneinsight.scripts.geneinsight_topic_modeling:main

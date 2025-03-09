@@ -85,7 +85,7 @@ def parse_args():
     
     parser.add_argument(
         "-o", "--output-dir",
-        default="./output",
+        default=".",
         help="Directory to store outputs (default: ./output)"
     )
     

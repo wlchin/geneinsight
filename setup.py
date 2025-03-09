@@ -98,8 +98,9 @@ setup(
             'geneinsight-api=geneinsight.scripts.geneinsight_api_process:main',
             'geneinsight-hypergeometric=geneinsight.scripts.geneinsight_hypergeometric:main',
             'geneinsight-filter=geneinsight.scripts.geneinsight_filter:main',
-            'geneinsight-meta=topicgenes.scripts.topicgenes_meta:main',
-            'geneinsight-counter=topicgenes.scripts.topicgenes_counter:main',
+            'geneinsight-meta=geneinsight.scripts.geneinsight_meta:main',
+            'geneinsight-counter=geneinsight.scripts.geneinsight_counter:main',
+            'geneinsight-report=geneinsight.scripts.geneinsight_report_pipeline:main',
         ],
     },
 

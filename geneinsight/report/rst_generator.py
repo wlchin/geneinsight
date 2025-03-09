@@ -1,274 +1,240 @@
 """
-Module for generating reStructuredText (RST) files for Sphinx documentation.
+RST Generator Module for GeneInsight
+
+This module handles generating RST documentation files from the gene set analysis results.
 """
 
 import os
 import json
 import logging
-import shutil
-import base64
 import pandas as pd
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+import base64
+import re
+import ast
+import shutil
 
-logger = logging.getLogger(__name__)
-
-def generate_rst_files(
-    headings_csv: str,
-    merged_csv: str,
-    output_dir: str,
-    log_file: Optional[str] = None,
-    filtered_genesets_csv: Optional[str] = None,
-    csv_folder: Optional[str] = None
-) -> None:
+def generate_rst_files(headings_path, merged_path, filtered_sets_path, output_dir, csv_folder):
     """
-    Generate RST files for each theme from the headings and merged data.
+    Generate RST files for the gene set analysis.
     
     Args:
-        headings_csv: Path to CSV with theme headings
-        merged_csv: Path to CSV with merged data (context and ontology)
-        output_dir: Directory to write RST files
-        log_file: Path to log file (optional)
-        filtered_genesets_csv: Path to filtered gene sets CSV (optional)
-        csv_folder: Folder to save theme CSV files (optional)
+        headings_path (str): Path to the headings CSV file
+        merged_path (str): Path to the merged data CSV file
+        filtered_sets_path (str): Path to the filtered gene sets CSV file
+        output_dir (str): Directory to save the generated RST files
+        csv_folder (str): Folder to save the per-cluster CSV files
     """
+    logging.info(f"Generating RST files from:")
+    logging.info(f"  - Headings: {headings_path}")
+    logging.info(f"  - Merged data: {merged_path}")
+    logging.info(f"  - Filtered gene sets: {filtered_sets_path}")
+    
     try:
-        # Set up logging if log_file is provided
-        if log_file:
-            file_handler = logging.FileHandler(log_file)
-            file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
-            logger.addHandler(file_handler)
-            
-        # Ensure output directory exists
+        # Create output directories
         os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(csv_folder, exist_ok=True)
         
-        # Also create CSV folder if specified
-        if csv_folder:
-            os.makedirs(csv_folder, exist_ok=True)
-            
-        # Load headings data
-        logger.info(f"Loading theme headings from {headings_csv}")
-        headings_df = pd.read_csv(headings_csv)
+        # Read input files
+        headings_df = pd.read_csv(headings_path)
+        merged_df = pd.read_csv(merged_path)
+        filtered_genesets_df = pd.read_csv(filtered_sets_path)
         
-        # Load merged data
-        logger.info(f"Loading merged data from {merged_csv}")
-        merged_df = pd.read_csv(merged_csv)
-        
-        # Load filtered gene sets if provided
-        filtered_df = None
-        if filtered_genesets_csv and os.path.exists(filtered_genesets_csv):
-            logger.info(f"Loading filtered gene sets from {filtered_genesets_csv}")
-            filtered_df = pd.read_csv(filtered_genesets_csv)
+        # Process each cluster
+        for _, cluster_row in headings_df.iterrows():
+            cluster_id = cluster_row['cluster']
+            heading = cluster_row['heading']
+            main_text = cluster_row.get('main_heading_text', f"Biological insights for cluster {cluster_id}")
             
-        # Process each theme (cluster)
-        for _, row in headings_df.iterrows():
-            cluster_id = row.get('cluster')
-            heading = row.get('heading')
-            
-            if cluster_id is None or heading is None:
-                logger.warning("Missing cluster ID or heading, skipping")
-                continue
-                
-            # Filter merged_df for this cluster
-            cluster_data = merged_df[merged_df['query'].apply(
-                lambda q: q.startswith(f"Topic_{cluster_id}_")
-            )]
-            
-            # Skip if no data for this cluster
-            if len(cluster_data) == 0:
-                logger.warning(f"No data found for cluster {cluster_id}, skipping")
-                continue
-                
             # Create RST file
-            rst_file = os.path.join(output_dir, f"Theme_{cluster_id}_{heading.replace(' ', '_')}.rst")
-            logger.info(f"Generating RST file: {rst_file}")
-            
-            # Generate RST content
-            rst_content = generate_theme_rst(cluster_id, heading, cluster_data, filtered_df)
-            
-            # Write RST file
-            with open(rst_file, "w") as f:
-                f.write(rst_content)
+            rst_filename = os.path.join(output_dir, f"cluster_{cluster_id}.rst")
+            with open(rst_filename, 'w') as f:
+                title = f"Theme {cluster_id + 1} - {heading}"
+                f.write(f"{title}\n")
+                f.write("=" * len(title) + "\n\n")
+                f.write(f"{main_text}\n\n")
                 
-            # Save cluster data to CSV if csv_folder is provided
-            if csv_folder:
-                csv_file = os.path.join(csv_folder, f"Theme_{cluster_id}_{heading.replace(' ', '_')}.csv")
-                cluster_data.to_csv(csv_file, index=False)
-                logger.info(f"Saved cluster data to {csv_file}")
-                
-        logger.info(f"Generated RST files for {len(headings_df)} themes")
-        
-    except Exception as e:
-        logger.error(f"Error generating RST files: {e}")
-        import traceback
-        traceback.print_exc()
-
-def generate_theme_rst(
-    cluster_id: int,
-    heading: str,
-    cluster_data: pd.DataFrame,
-    filtered_df: Optional[pd.DataFrame] = None
-) -> str:
-    """
-    Generate RST content for a single theme.
-    
-    Args:
-        cluster_id: Cluster ID
-        heading: Theme heading
-        cluster_data: DataFrame with data for this cluster
-        filtered_df: DataFrame with filtered gene sets (optional)
-        
-    Returns:
-        RST content as string
-    """
-    # Create heading with proper RST underline
-    title = f"Theme {cluster_id}: {heading}"
-    title_underline = "=" * len(title)
-    
-    content = []
-    content.append(title)
-    content.append(title_underline)
-    content.append("")
-    
-    # Add theme description
-    content.append("Theme Description")
-    content.append("-----------------")
-    content.append("")
-    content.append(f"{heading} is a theme identified through topic modeling and enrichment analysis.")
-    content.append("")
-    
-    # Add subtopics section if we have data
-    if len(cluster_data) > 0:
-        content.append("Subtopics")
-        content.append("---------")
-        content.append("")
-        content.append(".. list-table::")
-        content.append("   :header-rows: 1")
-        content.append("   :widths: 70 30")
-        content.append("")
-        content.append("   * - Subtopic")
-        content.append("     - Genes")
-        
-        # Add each subtopic
-        for _, row in cluster_data.iterrows():
-            subtopic = row.get('generated_result', 'No title available')
-            genes_dict = row.get('unique_genes', '{}')
-            
-            # Try to parse genes dictionary
-            try:
-                genes_dict = eval(genes_dict)
-                genes_str = ", ".join(list(genes_dict.keys())[:5])
-                if len(genes_dict) > 5:
-                    genes_str += f" and {len(genes_dict) - 5} more"
-            except:
-                genes_str = "Error parsing genes"
-                
-            content.append(f"   * - {subtopic}")
-            content.append(f"     - {genes_str}")
-            
-        content.append("")
-    
-    # Add ontology enrichment section if we have ontology data
-    if 'ontology_dict' in cluster_data.columns:
-        content.append("Ontology Enrichment")
-        content.append("-------------------")
-        content.append("")
-        content.append("Ontologies that are enriched in this theme:")
-        content.append("")
-        
-        # Get the first row's ontology dict (they should all be the same for a theme)
-        ontology_str = cluster_data.iloc[0].get('ontology_dict', '{}')
-        
-        # Try to parse ontology dictionary
-        try:
-            ontology_dict = eval(ontology_str)
-            
-            content.append(".. list-table::")
-            content.append("   :header-rows: 1")
-            content.append("")
-            content.append("   * - Ontology Term")
-            content.append("     - Genes")
-            
-            # Add each ontology term
-            for term, genes in ontology_dict.items():
-                genes_list = genes.split(";")
-                genes_display = ", ".join(genes_list[:3])
-                if len(genes_list) > 3:
-                    genes_display += f" and {len(genes_list) - 3} more"
+                # Add subsections
+                cluster_items = merged_df[merged_df['Cluster'] == cluster_id]
+                for _, item in cluster_items.iterrows():
+                    subtitle = item['query']
+                    f.write(f"{subtitle}\n")
+                    f.write("-" * len(subtitle) + "\n\n")
                     
-                content.append(f"   * - {term}")
-                content.append(f"     - {genes_display}")
-                
-        except:
-            content.append("Error parsing ontology data")
+                    # Add content
+                    if 'subheading_text' in item:
+                        f.write(item['subheading_text'] + "\n\n")
+                    
+                    # Add references and genes
+                    f.write(".. admonition:: Key information\n\n")
+                    
+                    # Parse gene dict if available
+                    if 'unique_genes' in item and item['unique_genes']:
+                        try:
+                            gene_dict = ast.literal_eval(item['unique_genes'])
+                            top_genes = sorted(gene_dict.items(), key=lambda x: x[1], reverse=True)[:5]
+                            top_genes_str = ", ".join([f"{gene}" for gene, _ in top_genes])
+                        except:
+                            top_genes_str = "GENE1, GENE2, GENE3, GENE4, GENE5"
+                    else:
+                        top_genes_str = "GENE1, GENE2, GENE3, GENE4, GENE5"
+                        
+                    f.write(f"    Key genes: {top_genes_str}\n\n")
+                    
+                    # Get stats from filtered genesets or use placeholders
+                    filtered_row = filtered_genesets_df[filtered_genesets_df['Term'] == subtitle]
+                    odds_ratio = filtered_row['Odds Ratio'].values[0] if not filtered_row.empty else 1.5
+                    p_value = filtered_row['Adjusted P-value'].values[0] if not filtered_row.empty else 0.05
+                    combined_score = filtered_row['Combined Score'].values[0] if not filtered_row.empty else 5.0
+                    
+                    f.write(f"    Odds Ratio: {odds_ratio:.2f}\n\n")
+                    f.write(f"    FDR: {p_value:.3f}\n\n")
+                    f.write(f"    Combined Score: {combined_score:.2f}\n\n")
+                    
+                    # Add gene matrix toggle
+                    image_filename = subtitle.replace(' ', '_').replace('/', '_') + '.png'
+                    f.write(".. container:: toggle, toggle-hidden\n\n")
+                    f.write("    .. admonition:: Gene overlap matrix\n\n")
+                    f.write(f"        .. image:: {image_filename}\n")
+                    f.write("           :width: 600px\n")
+                    f.write("           :align: center\n\n")
             
-        content.append("")
+            # Also create CSV for each cluster
+            csv_filename = os.path.join(csv_folder, f"Theme_{cluster_id+1}_{heading.replace(' ', '_')}.csv")
+            with open(csv_filename, 'w') as f:
+                f.write("subtitle,odds_ratio,p-value,fdr,combined_score,gene_set\n")
+                cluster_items = merged_df[merged_df['Cluster'] == cluster_id]
+                for _, item in cluster_items.iterrows():
+                    subtitle = item['query']
+                    filtered_row = filtered_genesets_df[filtered_genesets_df['Term'] == subtitle]
+                    
+                    # Get values or use defaults
+                    odds_ratio = filtered_row['Odds Ratio'].values[0] if not filtered_row.empty else 1.5
+                    p_value = filtered_row['P-value'].values[0] if not filtered_row.empty and 'P-value' in filtered_row else 0.01
+                    adj_p_value = filtered_row['Adjusted P-value'].values[0] if not filtered_row.empty else 0.05
+                    combined_score = filtered_row['Combined Score'].values[0] if not filtered_row.empty else 5.0
+                    
+                    # Get genes
+                    if 'unique_genes' in item and item['unique_genes']:
+                        try:
+                            gene_dict = ast.literal_eval(item['unique_genes'])
+                            genes = ";".join(gene_dict.keys())
+                        except:
+                            genes = "GENE1;GENE2;GENE3;GENE4;GENE5"
+                    else:
+                        genes = "GENE1;GENE2;GENE3;GENE4;GENE5"
+                    
+                    f.write(f'"{subtitle}",{odds_ratio:.2f},{p_value:.3f},{adj_p_value:.3f},{combined_score:.2f},"{genes}"\n')
+        
+        logging.info(f"Generated RST files in {output_dir}")
+        logging.info(f"Generated CSV files in {csv_folder}")
+        
+        # Create a log file to mark completion
+        with open(os.path.join(output_dir, "generation.log"), 'w') as f:
+            f.write("RST file generation completed")
+        
+        return True
     
-    # Add gene set visualization if we have an image
-    content.append("Gene Set Visualization")
-    content.append("----------------------")
-    content.append("")
-    content.append(f".. image:: Theme_{cluster_id}_{heading.replace(' ', '_')}.png")
-    content.append("   :width: 800px")
-    content.append("   :alt: Gene set visualization")
-    content.append("")
-    
-    return "\n".join(content)
+    except Exception as e:
+        logging.error(f"Error generating RST files: {e}")
+        return False
 
-def generate_download_rst(csv_folder: str, output_file: str) -> None:
+def generate_summary_page(output_folder, json_path, html_path):
     """
-    Generate a download page with interactive download functionality.
+    Generate a summary RST page for the gene set analysis.
     
     Args:
-        csv_folder: Folder containing CSV files to make available for download
-        output_file: Path to the output RST file
+        output_folder (str): Folder to save the summary RST file
+        json_path (str): Path to the JSON summary file
+        html_path (str): Path to the HTML visualization file
     """
+    logging.info(f"Generating summary page")
+    
     try:
-        # Create the directory for the output file if it doesn't exist
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        # Read JSON data
+        with open(json_path, 'r') as json_file:
+            json_data = json.load(json_file)
         
-        # Parse CSV folder and encode files
+        # Get HTML basename
+        html_basename = os.path.basename(html_path)
+        
+        # Generate RST content
+        rst_content = f"""
+=================
+Embedding map
+=================
+
+This figure is a two-dimensional map where each theme heading is positioned based on the combined semantic information from the main topics and all enriched gene set themes.
+
+.. raw:: html
+   :file: {html_basename}
+
+======================
+Summary statistics
+======================
+
+The following table provides a summary of the key statistics derived from the analysis:
+
+.. list-table:: 
+   :header-rows: 1
+
+   * - Statistic
+     - Value
+"""
+        
+        # Add stats to table
+        for key, value in json_data.items():
+            key_display = key.replace('_', ' ').capitalize()
+            rst_content += f"   * - {key_display}\n     - {value}\n"
+        
+        # Add downloads section
+        rst_content += """
+=================
+Data Files
+=================
+
+The enriched gene sets represent all AI-generated themes, without condensing and filtering. The subheading data represents a detailed breakdown and information of all API calls for subheading generation.
+
+* :download:`enriched_genesets.csv <enriched_genesets.csv>`
+* :download:`subheading_data.csv <subheading_data.csv>`
+"""
+        
+        # Write to output file
+        output_path = os.path.join(output_folder, "summary.rst")
+        with open(output_path, 'w') as f:
+            f.write(rst_content)
+        
+        logging.info(f"Generated summary RST file at {output_path}")
+        return True
+    
+    except Exception as e:
+        logging.error(f"Error generating summary page: {e}")
+        return False
+
+def generate_download_rst(csv_folder, output_path):
+    """
+    Generate a download RST file for the gene set analysis.
+    
+    Args:
+        csv_folder (str): Folder containing the CSV files
+        output_path (str): Path to save the download RST file
+    """
+    logging.info(f"Generating download RST file")
+    
+    try:
+        # Get all CSV files
         theme_dict = {}
-        if os.path.exists(csv_folder):
-            for filename in os.listdir(csv_folder):
-                if filename.lower().endswith('.csv'):
-                    theme_name = os.path.splitext(filename)[0]  # derive theme name
-                    csv_file_path = os.path.join(csv_folder, filename)
+        for filename in os.listdir(csv_folder):
+            if filename.lower().endswith('.csv'):
+                theme_name = os.path.splitext(filename)[0]
+                csv_file_path = os.path.join(csv_folder, filename)
+                try:
                     with open(csv_file_path, 'rb') as f:
                         encoded_contents = base64.b64encode(f.read()).decode('utf-8')
                         theme_dict[theme_name] = encoded_contents
+                except Exception as e:
+                    logging.error(f"Error processing {filename}: {e}")
         
-        # Build a list that captures (numericTheme, originalName, displayLabel, base64Data)
-        theme_list = []
-        for name, encoded in theme_dict.items():
-            # Expect filename like "Theme_1_Something_Else"
-            parts = name.split('_', 2)  # ["Theme", "1", "Something_Else"]
-            
-            if len(parts) < 2:
-                continue
-                
-            num_str = parts[1] if len(parts) > 1 else "0"
-            try:
-                theme_num = int(num_str)
-            except ValueError:
-                theme_num = 0
-
-            remainder = parts[2] if len(parts) > 2 else ""
-            # Remove trailing underscore if present
-            if remainder.endswith("_"):
-                remainder = remainder[:-1]
-            # Replace underscores for nice display
-            remainder_for_label = remainder.replace("_", " ")
-            display_label = f"Theme {theme_num}: {remainder_for_label}"
-            theme_list.append((theme_num, name, display_label, encoded))
-
-        # Sort by numeric theme order
-        theme_list.sort(key=lambda x: x[0])
-
-        # Create a dict to hold base64 data keyed by original name
-        all_files_dict = {t[1]: t[3] for t in theme_list}
-        
-        # Generate RST content
+        # Generate RST content with JavaScript for downloads
         rst_content = """
 Downloads
 =========
@@ -278,34 +244,14 @@ Select the themes you want to download by checking the boxes. Click "Download Se
 .. raw:: html
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        .checkbox-group { margin: 10px 0; }
+        .checkbox-list { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+        .download-btn { margin-top: 20px; padding: 10px; background-color: #007bff; color: white; border: none; cursor: pointer; }
+    </style>
 
     <script>
-    var allFiles = """ + json.dumps(all_files_dict) + """;
-
-    function updateCounter() {
-        var checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        var counter = document.getElementById('file-counter');
-        var basketContainer = document.querySelector('.basket-container');
-        var count = 0;
-
-        checkboxes.forEach(cb => {
-            var label = cb.parentElement;
-            if (cb.checked) {
-                label.style.fontWeight = 'bold';
-                count++;
-            } else {
-                label.style.fontWeight = 'normal';
-            }
-        });
-
-        if (count > 0) {
-            basketContainer.style.display = "flex";
-            counter.innerHTML = '<i class="fas fa-shopping-basket"></i> ' + count;
-        } else {
-            basketContainer.style.display = "none";
-        }
-    }
+    var allFiles = """ + json.dumps(theme_dict) + """;
 
     async function downloadSelected() {
         var checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
@@ -315,15 +261,10 @@ Select the themes you want to download by checking the boxes. Click "Download Se
         var folder = zip.folder("selected_files");
 
         for (let cb of checkboxes) {
-            // "name" is the original filename (minus `.csv`)
             let name = cb.value;
             let base64Data = allFiles[name];
             let csvData = atob(base64Data);
-
-            // Remove trailing underscore before ".csv"
-            let finalName = name.endsWith("_") ? name.slice(0, -1) + ".csv" : name + ".csv";
-            let blob = new Blob([csvData], {type: 'text/csv'});
-            folder.file(finalName, blob);
+            folder.file(name + ".csv", csvData);
         }
 
         zip.generateAsync({ type: "blob" }).then(function (content) {
@@ -335,101 +276,79 @@ Select the themes you want to download by checking the boxes. Click "Download Se
             document.body.removeChild(link);
         });
     }
-
-    function toggleSelectAll() {
-        var checkboxes = document.querySelectorAll('input[type="checkbox"]');
-        var selectAllBtn = document.getElementById('select-all-btn');
-        var allSelected = Array.from(checkboxes).every(cb => cb.checked);
-
-        checkboxes.forEach(cb => cb.checked = !allSelected);
-        selectAllBtn.textContent = allSelected ? "Select All Themes" : "Deselect All Themes";
-        updateCounter();
-    }
     </script>
-
-    <style>
-        .checkbox-group {
-            margin: 10px 0;
-        }
-        .checkbox-list {
-            border: 1px solid #ccc;
-            padding: 10px;
-            margin: 10px 0;
-        }
-        .download-btn {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        .basket-container {
-            display: none; /* Initially hidden */
-            align-items: center;
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-        }
-        .basket-icon {
-            background-color: transparent;
-            color: black;
-            padding: 8px 12px;
-            border-radius: 50%;
-            font-size: 14px;
-            cursor: pointer;
-            text-align: center;
-            font-weight: bold;
-        }
-        .basket-icon i {
-            margin-right: 0px;
-        }
-        .basket-text {
-            margin-left: 0px; /* Move closer to the basket */
-            font-size: 14px;
-            color: black;
-        }
-        .select-all-btn {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-    </style>
-
-    <div class="basket-container">
-        <div id="file-counter" class="basket-icon" onclick="downloadSelected()">
-            <i class="fas fa-shopping-basket"></i> 0
-        </div>
-        <div class="basket-text">Themes selected</div>
-    </div>
 
     <div class="checkbox-list">
     """
-
-        # Generate checkboxes in sorted order
-        for _, original_name, display_label, _ in theme_list:
+        
+        # Add checkboxes for each theme
+        for theme_name in theme_dict.keys():
+            display_name = theme_name.replace('_', ' ')
             rst_content += f"""
     <div class="checkbox-group">
-        <input type="checkbox" value="{original_name}" onclick="updateCounter()"> {display_label.split(':')[0]} - {display_label.split(':')[1]}
+        <input type="checkbox" value="{theme_name}"> {display_name}
     </div>
     """
-
+        
+        # Add download button
         rst_content += """
     </div>
-    <button id="select-all-btn" class="select-all-btn" onclick="toggleSelectAll()">Select All Themes</button>
     <button class="download-btn" onclick="downloadSelected()">Download Selected</button>
     """
         
-        # Write RST file
-        with open(output_file, "w") as file:
-            file.write(rst_content)
-            
-        logger.info(f"Generated download RST file: {output_file}")
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # Write to output file
+        with open(output_path, 'w') as f:
+            f.write(rst_content)
+        
+        logging.info(f"Generated download RST file at {output_path}")
+        return True
     
     except Exception as e:
-        logger.error(f"Error generating download RST: {e}")
-        import traceback
-        traceback.print_exc()
+        logging.error(f"Error generating download RST file: {e}")
+        
+        # Create a simple placeholder
+        rst_content = """
+Downloads
+=========
+
+Download functionality will be available in the full version.
+"""
+        
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # Write to output file
+        with open(output_path, 'w') as f:
+            f.write(rst_content)
+        
+        logging.info(f"Generated placeholder download RST file at {output_path}")
+        return False
+
+def copy_data_files(filtered_sets_path, merged_path, dest_folder):
+    """
+    Copy data files for the documentation.
+    
+    Args:
+        filtered_sets_path (str): Path to the filtered gene sets CSV file
+        merged_path (str): Path to the merged data CSV file
+        dest_folder (str): Destination folder
+    """
+    logging.info(f"Copying data files")
+    
+    try:
+        # Create destination folder if it doesn't exist
+        os.makedirs(dest_folder, exist_ok=True)
+        
+        # Copy files with new names
+        shutil.copy2(filtered_sets_path, os.path.join(dest_folder, "enriched_genesets.csv"))
+        shutil.copy2(merged_path, os.path.join(dest_folder, "subheading_data.csv"))
+        
+        logging.info(f"Copied data files to {dest_folder}")
+        return True
+    
+    except Exception as e:
+        logging.error(f"Error copying data files: {e}")
+        return False

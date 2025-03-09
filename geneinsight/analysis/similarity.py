@@ -34,6 +34,48 @@ def cosine_similarity(vec1, vec2) -> float:
     """
     return 1 - cosine(vec1, vec2)
 
+def find_best_similarity_threshold(embeddings, target_rows: int) -> float:
+    """
+    Find optimal similarity threshold using Optuna optimization when Count column is not available.
+    
+    Args:
+        embeddings: Pre-computed embeddings for terms
+        target_rows: Desired number of rows after filtering
+        
+    Returns:
+        Optimal similarity threshold
+    """
+    logger.info(f"Finding optimal similarity threshold with target rows: {target_rows}")
+    
+    def objective(trial) -> float:
+        # Parameter to optimize
+        t = trial.suggest_float('threshold', 0.01, 0.99)  # similarity threshold
+        
+        # Filter by similarity
+        used_indices = set()
+        for i in range(len(embeddings)):
+            if i in used_indices:
+                continue
+            for j in range(i+1, len(embeddings)):
+                if j not in used_indices and 1 - cosine(embeddings[i], embeddings[j]) >= t:
+                    used_indices.add(j)
+        
+        # Get filtered count
+        filtered_count = len(embeddings) - len(used_indices)
+        
+        # Return distance from target
+        return abs(filtered_count - target_rows)
+
+    # Create and run Optuna study
+    study = optuna.create_study(direction="minimize")
+    study.optimize(objective, n_trials=100)
+    
+    # Get best parameter
+    best_threshold = study.best_params['threshold']
+    
+    logger.info(f"Best similarity threshold found: {best_threshold:.4f}")
+    return best_threshold
+
 def find_best_params(embeddings, df: pd.DataFrame, target_rows: int) -> Tuple[float, float]:
     """
     Find optimal filtering parameters using Optuna optimization.
@@ -113,26 +155,48 @@ def filter_terms_by_similarity(
     logger.info("Embedding terms...")
     embeddings = model.encode(df['Term'].tolist(), show_progress_bar=True)
     
-    # Find optimal parameters
-    best_threshold, best_count_prop = find_best_params(embeddings, df, target_rows)
+    # Check if 'Count' column exists
+    has_count_column = 'Count' in df.columns
     
-    # Filter terms based on cosine similarity
-    logger.info(f"Filtering terms with similarity threshold: {best_threshold:.4f}")
-    used_indices = set()
-    for i in range(len(embeddings)):
-        if i in used_indices:
-            continue
-        for j in range(i + 1, len(embeddings)):
-            if cosine_similarity(embeddings[i], embeddings[j]) >= best_threshold:
-                used_indices.add(j)
-    
-    # Create a new DataFrame with the filtered terms
-    filtered_df = df.iloc[list(set(range(len(df))) - used_indices)]
-    
-    # Filter terms based on count proportion
-    logger.info(f"Filtering terms with count proportion: {best_count_prop:.4f}")
-    max_count = filtered_df['Count'].max()
-    filtered_df = filtered_df[filtered_df['Count'] >= best_count_prop * max_count]
+    if has_count_column:
+        logger.info("Found 'Count' column - using similarity and count for filtering")
+        # Find optimal parameters for both similarity and count
+        best_threshold, best_count_prop = find_best_params(embeddings, df, target_rows)
+        
+        # Filter terms based on cosine similarity
+        logger.info(f"Filtering terms with similarity threshold: {best_threshold:.4f}")
+        used_indices = set()
+        for i in range(len(embeddings)):
+            if i in used_indices:
+                continue
+            for j in range(i + 1, len(embeddings)):
+                if cosine_similarity(embeddings[i], embeddings[j]) >= best_threshold:
+                    used_indices.add(j)
+        
+        # Create a new DataFrame with the filtered terms
+        filtered_df = df.iloc[list(set(range(len(df))) - used_indices)]
+        
+        # Filter terms based on count proportion
+        logger.info(f"Filtering terms with count proportion: {best_count_prop:.4f}")
+        max_count = filtered_df['Count'].max()
+        filtered_df = filtered_df[filtered_df['Count'] >= best_count_prop * max_count]
+    else:
+        logger.info("No 'Count' column found - using only similarity for filtering")
+        # Find optimal parameters for similarity only
+        best_threshold = find_best_similarity_threshold(embeddings, target_rows)
+        
+        # Filter terms based on cosine similarity
+        logger.info(f"Filtering terms with similarity threshold: {best_threshold:.4f}")
+        used_indices = set()
+        for i in range(len(embeddings)):
+            if i in used_indices:
+                continue
+            for j in range(i + 1, len(embeddings)):
+                if cosine_similarity(embeddings[i], embeddings[j]) >= best_threshold:
+                    used_indices.add(j)
+        
+        # Create a new DataFrame with the filtered terms
+        filtered_df = df.iloc[list(set(range(len(df))) - used_indices)]
     
     logger.info(f"Final filtered dataset contains {len(filtered_df)} terms")
     

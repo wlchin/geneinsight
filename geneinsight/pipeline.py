@@ -25,7 +25,7 @@ class Pipeline:
     def __init__(
         self,
         output_dir: str,
-        temp_dir: Optional[str] = "temp",  # Changed default to "temp"
+        temp_dir: Optional[str] = None,
         n_samples: int = 5,
         num_topics: Optional[int] = 10,
         pvalue_threshold: float = 0.01,
@@ -51,7 +51,15 @@ class Pipeline:
             target_filtered_topics: Target number of topics after filtering
         """
         self.output_dir = os.path.abspath(output_dir)
-        self.temp_dir = os.path.abspath(temp_dir if temp_dir is not None else "temp")  # Fallback to "temp" if None
+        
+        # Use system temp directory if none specified
+        if temp_dir is None:
+            self.temp_dir = tempfile.mkdtemp(prefix="topicgenes_")
+            self._temp_is_system = True
+        else:
+            self.temp_dir = os.path.abspath(temp_dir)
+            self._temp_is_system = False
+            
         self.n_samples = n_samples
         self.num_topics = num_topics
         self.pvalue_threshold = pvalue_threshold
@@ -76,6 +84,7 @@ class Pipeline:
             "resampled_topics": os.path.join(self.temp_dir, "resampled_topics"),
             "key_topics": os.path.join(self.temp_dir, "key_topics"),
             "final": os.path.join(self.output_dir, "results"),
+            "report": os.path.join(self.temp_dir, "report"),
         }
         
         # Create all subdirectories
@@ -93,6 +102,9 @@ class Pipeline:
         query_gene_set: str,
         background_gene_list: str,
         zip_output: bool = True,
+        generate_report: bool = False,
+        report_dir: Optional[str] = None,
+        report_title: Optional[str] = None,
     ) -> str:
         """
         Run the full pipeline.
@@ -101,6 +113,9 @@ class Pipeline:
             query_gene_set: Path to file containing query gene set
             background_gene_list: Path to file containing background gene list
             zip_output: Whether to zip the output directory
+            generate_report: Whether to generate an HTML report
+            report_dir: Directory to store the generated report
+            report_title: Title for the generated report
             
         Returns:
             Path to the output directory or zip file
@@ -112,75 +127,106 @@ class Pipeline:
         run_id = f"{gene_set_name}_{self.timestamp}"
         logger.info(f"Run ID: {run_id}")
         
-        # 1. Get gene enrichment data from StringDB
-        logger.info("Step 1: Retrieving gene enrichment data from StringDB")
-        enrichment_df, documents_df = self._get_stringdb_enrichment(query_gene_set)
-        
-        # 2. Run topic modeling
-        logger.info("Step 2: Running topic modeling")
-        topics_df = self._run_topic_modeling(documents_df)
-        
-        # 3. Generate prompts
-        logger.info("Step 3: Generating prompts for topic refinement")
-        prompts_df = self._generate_prompts(topics_df)
-        
-        # 4. Process through API (without caching)
-        logger.info("Step 4: Processing prompts through API without caching")
-        api_results_df = self._process_api_calls(prompts_df)
-        
-        # 5. Create summary
-        logger.info("Step 5: Creating summary")
-        summary_df = self._create_summary(api_results_df, enrichment_df)
-        summary_df.to_csv("testing.csv", index=False)
-        
-        # 6. Perform hypergeometric enrichment
-        logger.info("Step 6: Performing hypergeometric enrichment")
-        enriched_df = self._perform_hypergeometric_enrichment(
-            summary_df, query_gene_set, background_gene_list
-        )
-        
-        # 7. Run topic modeling on the filtered gene sets (meta-analysis)
-        logger.info("Step 7: Running topic modeling on filtered gene sets")
-        topics_df = self._run_topic_modeling_on_filtered_sets(enriched_df)
-        
-        # 8. Extract key topics
-        logger.info("Step 8: Extracting key topics")
-        key_topics_df = self._get_key_topics(topics_df)
-        
-        # 9. Filter topics by similarity using key topics
-        logger.info("Step 9: Filtering topics by similarity")
-        filtered_df = self._filter_topics(key_topics_df)
-        
-        # If the filtered DataFrame has fewer than the target rows (default: 25), 
-        # then use the entire enriched DataFrame as input for filtering and clustering.
-        if len(filtered_df) < self.target_filtered_topics:
-            logger.info("Filtered topics fewer than target; using entire enriched dataframe for filtering and clustering.")
-            filtered_df = self._filter_topics(enriched_df)
-        
-        # 9b. Run clustering on the filtered topics
-        logger.info("Step 9b: Clustering filtered topics")
-        clustered_df = self._run_clustering(filtered_df)
-        
-        # 10. Finalize outputs and cleanup
-        logger.info("Step 10: Finalizing outputs")
-        output_path = self._finalize_outputs(
-            run_id,
-            {
-                "enrichment": enrichment_df,
-                "documents": documents_df,
-                "topics": topics_df,
-                "prompts": prompts_df,
-                "api_results": api_results_df,
-                "summary": summary_df,
-                "enriched": enriched_df,
-                "key_topics": key_topics_df,
-                "clustered": clustered_df,
-            },
-            zip_output
-        )
-        
-        logger.info(f"Pipeline completed successfully. Results available at: {output_path}")
-        return output_path
+        try:
+            # 1. Get gene enrichment data from StringDB
+            logger.info("Step 1: Retrieving gene enrichment data from StringDB")
+            enrichment_df, documents_df = self._get_stringdb_enrichment(query_gene_set)
+            
+            # 2. Run topic modeling
+            logger.info("Step 2: Running topic modeling")
+            topics_df = self._run_topic_modeling(documents_df)
+            
+            # 3. Generate prompts
+            logger.info("Step 3: Generating prompts for topic refinement")
+            prompts_df = self._generate_prompts(topics_df)
+            
+            # 4. Process through API (without caching)
+            logger.info("Step 4: Processing prompts through API without caching")
+            api_results_df = self._process_api_calls(prompts_df)
+            
+            # 5. Create summary
+            logger.info("Step 5: Creating summary")
+            summary_df = self._create_summary(api_results_df, enrichment_df)
+            
+            # 6. Perform hypergeometric enrichment
+            logger.info("Step 6: Performing hypergeometric enrichment")
+            enriched_df = self._perform_hypergeometric_enrichment(
+                summary_df, query_gene_set, background_gene_list
+            )
+            
+            # 7. Run topic modeling on the filtered gene sets (meta-analysis)
+            logger.info("Step 7: Running topic modeling on filtered gene sets")
+            topics_df = self._run_topic_modeling_on_filtered_sets(enriched_df)
+            
+            # 8. Extract key topics
+            logger.info("Step 8: Extracting key topics")
+            key_topics_df = self._get_key_topics(topics_df)
+            
+            # 9. Filter topics by similarity using key topics
+            logger.info("Step 9: Filtering topics by similarity")
+            filtered_df = self._filter_topics(key_topics_df)
+            
+            # If the filtered DataFrame has fewer than the target rows (default: 25), 
+            # then use the entire enriched DataFrame as input for filtering and clustering.
+            if len(filtered_df) < self.target_filtered_topics:
+                logger.info("Filtered topics fewer than target; using entire enriched dataframe for filtering and clustering.")
+                filtered_df = self._filter_topics(enriched_df)
+            
+            # 9b. Run clustering on the filtered topics
+            logger.info("Step 9b: Clustering filtered topics")
+            clustered_df = self._run_clustering(filtered_df)
+            
+            # 10. Finalize outputs and cleanup
+            logger.info("Step 10: Finalizing outputs")
+            output_path = self._finalize_outputs(
+                run_id,
+                {
+                    "enrichment": enrichment_df,
+                    "documents": documents_df,
+                    "topics": topics_df,
+                    "prompts": prompts_df,
+                    "api_results": api_results_df,
+                    "summary": summary_df,
+                    "enriched": enriched_df,
+                    "key_topics": key_topics_df,
+                    "clustered": clustered_df,
+                },
+                zip_output
+            )
+            
+            # 11. Generate report if requested
+            if generate_report:
+                report_output = self._generate_report(
+                    output_path=output_path,
+                    query_gene_set=query_gene_set,
+                    report_dir=report_dir,
+                    report_title=report_title
+                )
+                if report_output:
+                    logger.info(f"Report generated successfully at {report_output}")
+                else:
+                    logger.warning("Report generation failed or was skipped")
+            
+            logger.info(f"Pipeline completed successfully. Results available at: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            logger.error(f"Error in pipeline: {e}", exc_info=True)
+            raise
+        finally:
+            # Only clean up if we used a system temp directory
+            if self._temp_is_system:
+                self._cleanup_temp()
+    
+    def _cleanup_temp(self):
+        """Clean up temporary directory if it's a system-generated one."""
+        if hasattr(self, '_temp_is_system') and self._temp_is_system and os.path.exists(self.temp_dir):
+            try:
+                import shutil
+                logger.info(f"Cleaning up temporary directory: {self.temp_dir}")
+                shutil.rmtree(self.temp_dir)
+            except Exception as e:
+                logger.warning(f"Error cleaning up temporary directory: {e}")
     
     def _get_stringdb_enrichment(self, query_gene_set: str) -> tuple:
         """Get gene enrichment data from StringDB."""
@@ -387,6 +433,131 @@ class Pipeline:
         clustered_df = pd.read_csv(clustering_output)
         return clustered_df
     
+    def _generate_report(
+        self,
+        output_path: str,
+        query_gene_set: str,
+        report_dir: Optional[str] = None,
+        report_title: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Generate an HTML report from the pipeline results.
+        
+        Args:
+            output_path: Path to the pipeline output (directory or zip file)
+            query_gene_set: Path to the query gene set file (for deriving title if needed)
+            report_dir: Directory to store the generated report (uses temp dir if None)
+            report_title: Title for the generated report (derived from gene set name if None)
+            
+        Returns:
+            Path to the generated report directory, or None if generation failed
+        """
+        logger.info("Generating HTML report...")
+        
+        # Import here to avoid importing unless needed
+        try:
+            from .scripts.geneinsight_report import generate_report
+        except ImportError as e:
+            logger.error(f"Could not generate report: {e}")
+            logger.error("Make sure you have installed the report generation dependencies:")
+            logger.error("pip install umap-learn plotly colorcet sphinx sphinx-rtd-theme pillow")
+            return None
+        
+        # Use the report directory in the temp dir if none specified
+        if not report_dir:
+            report_dir = self.dirs["report"]
+        else:
+            report_dir = os.path.abspath(report_dir)
+        
+        # Ensure report directory exists
+        os.makedirs(report_dir, exist_ok=True)
+        logger.info(f"Report will be generated in: {report_dir}")
+        
+        # Derive report title from gene set name if not provided
+        if not report_title:
+            gene_set_name = os.path.splitext(os.path.basename(query_gene_set))[0]
+            report_title = f"TopicGenes Analysis: {gene_set_name}"
+        
+        logger.info(f"Report title: {report_title}")
+        
+        # Prepare results directory
+        results_dir = output_path
+        extract_dir = None
+        
+        # Log the current state of directories
+        logger.info(f"Results directory to be used for report: {results_dir}")
+        logger.info(f"Checking if results directory exists: {os.path.exists(results_dir)}")
+        
+        if os.path.exists(results_dir):
+            logger.info(f"Contents of results directory:")
+            for root, dirs, files in os.walk(results_dir):
+                rel_path = os.path.relpath(root, results_dir)
+                if rel_path == '.':
+                    logger.info(f"Root directory files: {files}")
+                else:
+                    logger.info(f"Subdirectory {rel_path}: {files}")
+        
+        # Handle ZIP files - extract to temporary location within our temp directory
+        if os.path.isfile(output_path) and output_path.endswith('.zip'):
+            import zipfile
+            
+            # Create a temporary directory for extracted files within our temp dir
+            extract_dir = os.path.join(self.temp_dir, "extracted_results")
+            os.makedirs(extract_dir, exist_ok=True)
+            logger.info(f"Created temporary extraction directory: {extract_dir}")
+            
+            # Extract the zip file
+            logger.info(f"Extracting results from {output_path} for report generation...")
+            with zipfile.ZipFile(output_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+                logger.info(f"Extracted files: {os.listdir(extract_dir)}")
+            
+            # Look for the results directory within the extracted files
+            extracted_dirs = [d for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))]
+            if "results" in extracted_dirs:
+                # If there's a results directory, use that
+                results_dir = os.path.join(extract_dir, "results")
+                logger.info(f"Using extracted results directory: {results_dir}")
+            else:
+                # Otherwise use the whole extraction directory
+                results_dir = extract_dir
+                logger.info(f"Using entire extraction directory: {results_dir}")
+        elif os.path.isdir(output_path):
+            # If output_path is a directory, check for a results directory inside it
+            if os.path.exists(os.path.join(output_path, "results")):
+                results_dir = os.path.join(output_path, "results")
+                logger.info(f"Using results subdirectory: {results_dir}")
+        
+        try:
+            # Generate the report with debug logging enabled
+            logger.info(f"Calling generate_report with results_dir={results_dir}, output_dir={report_dir}")
+            report_path = generate_report(
+                results_dir=results_dir,
+                output_dir=report_dir,
+                title=report_title,
+                cleanup=False  # Set to False for debugging to keep temporary files
+            )
+            
+            if report_path:
+                index_html = os.path.join(report_path, 'html/build/html/index.html')
+                logger.info(f"Report generated successfully")
+                logger.info(f"Open {index_html} in a web browser to view")
+                return report_path
+            else:
+                logger.error("Report generation failed")
+                return None
+                    
+        finally:
+            # Clean up the temporary extraction directory if we created one
+            if extract_dir and os.path.exists(extract_dir):
+                logger.info("Cleaning up temporary extracted files...")
+                try:
+                    import shutil
+                    shutil.rmtree(extract_dir)
+                    logger.info("Temporary extraction directory cleaned up successfully")
+                except Exception as e:
+                    logger.warning(f"Error cleaning up temporary extraction directory: {e}")
+    
     def _finalize_outputs(
         self,
         run_id: str,
@@ -475,8 +646,19 @@ if __name__ == "__main__":
         "--target_filtered_topics", type=int, default=25, help="Target number of topics after filtering."
     )
     parser.add_argument(
-        "--temp_dir", type=str, default="temp", help="Temporary directory for intermediate files."
+        "--temp_dir", type=str, default=None, help="Temporary directory for intermediate files."
     )
+    # Add report generation arguments
+    parser.add_argument(
+        "--generate_report", action="store_true", help="Generate an HTML report after pipeline completion."
+    )
+    parser.add_argument(
+        "--report_dir", type=str, default=None, help="Directory to store the generated report."
+    )
+    parser.add_argument(
+        "--report_title", type=str, default=None, help="Title for the generated report."
+    )
+    
     args = parser.parse_args()
     
     pipeline = Pipeline(
@@ -491,4 +673,12 @@ if __name__ == "__main__":
         api_base_url=args.api_base_url,
         target_filtered_topics=args.target_filtered_topics,
     )
-    pipeline.run(args.query_gene_set, args.background_gene_list, zip_output=args.zip_output)
+    
+    pipeline.run(
+        query_gene_set=args.query_gene_set, 
+        background_gene_list=args.background_gene_list, 
+        zip_output=args.zip_output,
+        generate_report=args.generate_report,
+        report_dir=args.report_dir,
+        report_title=args.report_title
+    )

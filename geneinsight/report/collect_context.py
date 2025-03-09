@@ -189,8 +189,8 @@ def generate_context(summary_path, clustered_topics_path, output_headings_path, 
       - Saving the output CSV files
     
     Args:
-        summary_path (str): Path to the summary CSV file.
-        clustered_topics_path (str): Path to the clustered topics CSV file.
+        summary_path (str): Path to the summary CSV file. Expected to contain columns: "query", "unique_genes", "context"
+        clustered_topics_path (str): Path to the clustered topics CSV file. Expected to contain columns: "Term", "Cluster"
         output_headings_path (str): Path to save the generated headings CSV file.
         output_subheadings_path (str): Path to save the generated subheadings CSV file.
         service (str): Service to use for API calls (only "openai" is supported).
@@ -218,19 +218,26 @@ def generate_context(summary_path, clustered_topics_path, output_headings_path, 
     except Exception as e:
         logging.error(f"Error reading input files: {e}")
         raise
+
+    # Check for required columns in summary_df
+    for col in ["query", "unique_genes", "context"]:
+        if col not in summary_df.columns:
+            logging.error(f"Required column '{col}' not found in summary CSV.")
+            raise ValueError(f"Required column '{col}' not found in summary CSV.")
+    
+    # Check for required columns in clustered_df
+    for col in ["Term", "Cluster"]:
+        if col not in clustered_df.columns:
+            logging.error(f"Required column '{col}' not found in clustered topics CSV.")
+            raise ValueError(f"Required column '{col}' not found in clustered topics CSV.")
     
     # Merge summary with clustered topics for subheading processing
     merged_df = summary_df.loc[summary_df["query"].isin(clustered_df["Term"])].merge(
         clustered_df, left_on="query", right_on="Term", how="left"
     )
     
-    # Generate subheadings in parallel
-    # Use "context" column if present; otherwise fall back to "query"
-    if "context" in merged_df.columns:
-        unique_contexts = merged_df["context"].unique()
-    else:
-        unique_contexts = merged_df["query"].unique()
-    
+    # Generate subheadings in parallel using the "context" column for additional background
+    unique_contexts = merged_df["context"].unique()
     context_map = parallel_subheading_text(
         contexts=unique_contexts,
         service=service,
@@ -240,14 +247,9 @@ def generate_context(summary_path, clustered_topics_path, output_headings_path, 
         n_jobs=n_jobs
     )
     
-    # Create subheadings DataFrame
-    subheading_df = merged_df[["query", "Cluster"]].drop_duplicates().copy()
-    if "context" in merged_df.columns:
-        subheading_df["context"] = merged_df.drop_duplicates("query")["context"]
-        subheading_df["subheading_text"] = subheading_df["context"].map(context_map)
-    else:
-        subheading_df["context"] = subheading_df["query"]
-        subheading_df["subheading_text"] = subheading_df["query"].map(context_map)
+    # Create subheadings DataFrame including unique_genes and additional background
+    subheading_df = merged_df[["query", "context", "unique_genes", "Cluster"]].drop_duplicates().copy()
+    subheading_df["subheading_text"] = subheading_df["context"].map(context_map)
     
     # Add reference dictionary if available
     if {"reference_description", "reference_term", "reference_genes"}.issubset(merged_df.columns):
@@ -266,7 +268,7 @@ def generate_context(summary_path, clustered_topics_path, output_headings_path, 
         subheading_df["ref_dict"] = subheading_df["query"].map(ref_dict_map)
     else:
         subheading_df["ref_dict"] = None
-    subheading_df = subheading_df[["query", "subheading_text", "context", "ref_dict", "Cluster"]]
+    subheading_df = subheading_df[["query", "subheading_text", "context", "unique_genes", "ref_dict", "Cluster"]]
     
     # Process main headings in parallel
     cluster_data = []
@@ -298,11 +300,9 @@ def generate_context(summary_path, clustered_topics_path, output_headings_path, 
     headings_df["main_heading_text"] = main_heading_texts
     
     # Save output CSV files
-    os.makedirs(os.path.dirname(output_headings_path), exist_ok=True)
     headings_df.to_csv(output_headings_path, index=False)
     logging.info(f"Saved headings to {output_headings_path}")
     
-    os.makedirs(os.path.dirname(output_subheadings_path), exist_ok=True)
     subheading_df.to_csv(output_subheadings_path, index=False)
     logging.info(f"Saved subheadings to {output_subheadings_path}")
     

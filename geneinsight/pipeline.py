@@ -619,52 +619,52 @@ class Pipeline:
         
         return run_dir
 
-def _perform_ontology_enrichment(
-    self, 
-    summary_df: pd.DataFrame,
-    clustered_df: pd.DataFrame,
-    query_gene_set: str,
-    background_gene_list: str
-) -> pd.DataFrame:
-    """
-    Perform ontology enrichment analysis using the ontology workflow.
-    
-    Args:
-        summary_df: DataFrame containing gene summary information
-        clustered_df: DataFrame containing clustered topics
-        query_gene_set: Path to the query gene set file
-        background_gene_list: Path to the background genes file
+    def _perform_ontology_enrichment(
+        self, 
+        summary_df: pd.DataFrame,
+        clustered_df: pd.DataFrame,
+        query_gene_set: str,
+        background_gene_list: str
+    ) -> pd.DataFrame:
+        """
+        Perform ontology enrichment analysis using the ontology workflow.
         
-    Returns:
-        DataFrame containing the ontology dictionary
-    """
-    logger.info("Running ontology enrichment analysis")
-    
-    # Initialize the ontology workflow
-    ontology_folder = os.path.join(os.path.dirname(__file__), "ontology", "ontology_folders")
-    workflow = OntologyWorkflow(
-        ontology_folder=ontology_folder,
-        fdr_threshold=self.pvalue_threshold,
-        use_temp_files=False  # Process dataframes in memory
-    )
-    
-    # Create output directory for ontology results
-    ontology_output_dir = os.path.join(self.dirs["final"], "ontology")
-    os.makedirs(ontology_output_dir, exist_ok=True)
-    
-    # Process dataframes directly
-    enrichment_df, ontology_dict_df = workflow.process_dataframes(
-        summary_df=summary_df,
-        clustered_df=clustered_df,
-        gene_list_path=query_gene_set,
-        background_genes_path=background_gene_list,
-        output_dir=ontology_output_dir
-    )
-    
-    # Log information about the results
-    logger.info(f"Ontology enrichment complete. Found {len(ontology_dict_df)} ontology dictionaries.")
-    
-    return ontology_dict_df
+        Args:
+            summary_df: DataFrame containing gene summary information
+            clustered_df: DataFrame containing clustered topics
+            query_gene_set: Path to the query gene set file
+            background_gene_list: Path to the background genes file
+            
+        Returns:
+            DataFrame containing the ontology dictionary
+        """
+        logger.info("Running ontology enrichment analysis")
+        
+        # Initialize the ontology workflow
+        ontology_folder = os.path.join(os.path.dirname(__file__), "ontology", "ontology_folders")
+        workflow = OntologyWorkflow(
+            ontology_folder=ontology_folder,
+            fdr_threshold=self.pvalue_threshold,
+            use_temp_files=False  # Process dataframes in memory
+        )
+        
+        # Create output directory for ontology results
+        ontology_output_dir = os.path.join(self.dirs["final"], "ontology")
+        os.makedirs(ontology_output_dir, exist_ok=True)
+        
+        # Process dataframes directly
+        enrichment_df, ontology_dict_df = workflow.process_dataframes(
+            summary_df=summary_df,
+            clustered_df=clustered_df,
+            gene_list_path=query_gene_set,
+            background_genes_path=background_gene_list,
+            output_dir=ontology_output_dir
+        )
+        
+        # Log information about the results
+        logger.info(f"Ontology enrichment complete. Found {len(ontology_dict_df)} ontology dictionaries.")
+        
+        return ontology_dict_df
 
 
 

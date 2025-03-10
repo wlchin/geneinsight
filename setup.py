@@ -11,7 +11,7 @@ DESCRIPTION = 'Topic modeling pipeline for gene sets with enrichment analysis'
 URL = 'https://github.com/yourusername/geneinsight'
 EMAIL = 'your.email@example.com'
 AUTHOR = 'Your Name'
-REQUIRES_PYTHON = '>=3.9,<3.13'
+REQUIRES_PYTHON = '>=3.9'
 VERSION = '0.1.0'
 
 # Required packages

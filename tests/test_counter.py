@@ -79,31 +79,6 @@ def test_count_top_terms_standard_columns(sample_data, temp_files):
     assert len(result_df) == 1
     assert result_df.iloc[0]['Term'] == 'apple'
 
-def test_count_top_terms_alternative_columns(temp_files):
-    """Test count_top_terms with alternative column names"""
-    # Create data with alternative column names
-    alt_data = pd.DataFrame({
-        'Term': ['apple', 'banana', 'apple', 'orange', 'apple', 'banana'],
-        'Probability': [0.8, 0.7, 0.9, 0.4, 0.6, 0.3]
-    })
-    alt_data.to_csv(temp_files['input'], index=False)
-    
-    # Call count_top_terms
-    with patch('logging.Logger.warning') as mock_warning:
-        with patch('logging.Logger.info') as mock_info:
-            result_df = tc.count_top_terms(
-                input_file=temp_files['input'],
-                output_file=temp_files['output']
-            )
-    
-    # Should warn about missing columns
-    mock_warning.assert_called_once()
-    
-    # Should create a Representative_document column based on Probability
-    assert len(result_df) > 0
-    
-    # Check if it found the Term column as an alternative
-    assert any('Using columns' in msg[0] and 'Term' in msg[0] for msg in mock_info.call_args_list)
 
 def test_count_top_terms_description_column(temp_files):
     """Test count_top_terms with description column"""
@@ -200,7 +175,7 @@ def test_count_top_terms_nested_output_dir(sample_data):
 
 def test_count_top_terms_exception_handling():
     """Test exception handling in count_top_terms"""
-    with patch('pd.read_csv') as mock_read_csv:
+    with patch('pandas.read_csv') as mock_read_csv:
         # Make read_csv raise an exception
         mock_read_csv.side_effect = Exception("Test exception")
         

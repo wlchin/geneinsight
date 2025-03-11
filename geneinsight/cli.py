@@ -85,7 +85,7 @@ def parse_args():
     
     parser.add_argument(
         "-o", "--output-dir",
-        default=".",
+        default="./output",
         help="Directory to store outputs (default: ./output)"
     )
     
@@ -140,27 +140,14 @@ def parse_args():
     )
     
     parser.add_argument(
-        "--no-zip",
+        "--no-report",
         action="store_true",
-        help="Do not zip the output directory"
+        help="Do not generate an HTML report after pipeline completion"
     )
     
     parser.add_argument(
         "-c", "--config",
         help="Path to configuration file (JSON or YAML)"
-    )
-    
-    # Add report generation arguments
-    parser.add_argument(
-        "--generate-report",
-        action="store_true",
-        help="Generate an HTML report after pipeline completion"
-    )
-    
-    parser.add_argument(
-        "--report-dir",
-        default=None,
-        help="(Ignored) Report directory is fixed to results/sphinx_builds."
     )
     
     parser.add_argument(
@@ -238,9 +225,7 @@ def main():
         output_path = pipeline.run(
             query_gene_set=args.query_gene_set,
             background_gene_list=args.background_gene_list,
-            zip_output=not args.no_zip,
-            generate_report=args.generate_report,
-            report_dir=args.report_dir,
+            generate_report=not args.no_report,
             report_title=args.report_title
         )
         

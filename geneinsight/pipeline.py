@@ -102,9 +102,7 @@ class Pipeline:
         self,
         query_gene_set: str,
         background_gene_list: str,
-        zip_output: bool = False,
-        generate_report: bool = False,
-        report_dir: Optional[str] = None,
+        generate_report: bool = True,
         report_title: Optional[str] = None,
     ) -> str:
         """
@@ -113,13 +111,11 @@ class Pipeline:
         Args:
             query_gene_set: Path to file containing query gene set
             background_gene_list: Path to file containing background gene list
-            zip_output: Whether to zip the output directory or zip file
-            generate_report: Whether to generate an HTML report
-            report_dir: Directory to store the generated report
+            generate_report: Whether to generate an HTML report (default: True)
             report_title: Title for the generated report
             
         Returns:
-            Path to the output directory or zip file
+            Path to the output directory
         """
         logger.info(f"Starting pipeline run with query gene set: {query_gene_set}")
         
@@ -201,8 +197,7 @@ class Pipeline:
                     "key_topics": key_topics_df,
                     "clustered": clustered_df,
                     "ontology_dict": ontology_dict_df,
-                },
-                zip_output
+                }
             )
             
             # 11. Generate report if requested
@@ -210,7 +205,6 @@ class Pipeline:
                 report_output = self._generate_report(
                     output_path=output_path,
                     query_gene_set=query_gene_set,
-                    report_dir=report_dir,
                     report_title=report_title
                 )
                 if report_output:
@@ -222,8 +216,8 @@ class Pipeline:
             if os.path.isdir(output_path):
                 self._reorganize_output_directory(output_path)
             
-            logger.info(f"Pipeline completed successfully. Results available at: {output_path}")
-            return output_path
+            logger.info(f"Pipeline completed successfully. Results available at: {self.dirs['final']}")
+            return self.dirs["final"]
             
         except Exception as e:
             logger.error(f"Error in pipeline: {e}", exc_info=True)
@@ -543,17 +537,15 @@ class Pipeline:
         self,
         output_path: str,
         query_gene_set: str,
-        report_dir: Optional[str] = None,
         report_title: Optional[str] = None,
     ) -> Optional[str]:
         """
         Generate an HTML report using geneinsight.reports.pipeline.run_pipeline.
 
         Args:
-            output_path: Path to the pipeline output (directory or zip file)
+            output_path: Path to the pipeline output directory
             query_gene_set: Path to the query gene set file (used to derive the gene set name)
-            report_dir: Directory to store the generated report (ignored, using fixed sphinx_builds directory)
-            report_title: (Unused) Title for the report generation process
+            report_title: Title for the report
 
         Returns:
             Path to the generated Sphinx HTML index, or None if generation failed.
@@ -567,22 +559,8 @@ class Pipeline:
         report_out_dir = self.dirs["sphinx_builds"]
         os.makedirs(report_out_dir, exist_ok=True)
 
-        # Determine the input folder for the report generation.
-        if os.path.isfile(output_path) and output_path.endswith('.zip'):
-            import zipfile, shutil
-            extract_dir = os.path.join(self.temp_dir, "extracted_report")
-            if os.path.exists(extract_dir):
-                shutil.rmtree(extract_dir)
-            os.makedirs(extract_dir, exist_ok=True)
-            logger.info(f"Extracting report files from zip: {output_path} to {extract_dir}")
-            with zipfile.ZipFile(output_path, 'r') as zip_ref:
-                zip_ref.extractall(extract_dir)
-            input_folder = extract_dir
-        elif os.path.isdir(output_path):
-            input_folder = output_path
-        else:
-            logger.error("Output path for report generation is not valid.")
-            return None
+        # Input folder is the output_path
+        input_folder = output_path
 
         try:
             from .report import pipeline as reports_pipeline
@@ -601,22 +579,18 @@ class Pipeline:
     def _finalize_outputs(
         self,
         run_id: str,
-        dataframes: Dict[str, pd.DataFrame],
-        zip_output: bool = False
+        dataframes: Dict[str, pd.DataFrame]
     ) -> str:
         """
-        Finalize outputs by copying to the output directory and optionally zipping.
+        Finalize outputs by copying to the output directory.
         
         Args:
             run_id: Unique identifier for this run
             dataframes: Dictionary of dataframes to save
-            zip_output: Whether to zip the output directory
             
         Returns:
-            Path to the output directory or zip file
+            Path to the output directory
         """
-        from .utils.zip_helper import zip_directory
-        
         run_dir = os.path.join(self.dirs["final"], run_id)
         os.makedirs(run_dir, exist_ok=True)
         
@@ -637,12 +611,6 @@ class Pipeline:
         
         metadata_path = os.path.join(run_dir, "metadata.csv")
         pd.DataFrame([metadata]).to_csv(metadata_path, index=False)
-        
-        if zip_output:
-            zip_path = os.path.join(self.output_dir, f"{run_id}.zip")
-            zip_directory(run_dir, zip_path)
-            logger.info(f"Zipped output directory to {zip_path}")
-            return zip_path
         
         return run_dir
 
@@ -698,16 +666,16 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Run the TopicGenes pipeline.")
     parser.add_argument(
-        "-q", "--query_gene_set", required=True, help="Path to file containing query gene set."
+        "query_gene_set", help="Path to file containing query gene set."
     )
     parser.add_argument(
-        "-b", "--background_gene_list", required=True, help="Path to file containing background gene list."
+        "background_gene_list", help="Path to file containing background gene list."
     )
     parser.add_argument(
-        "-o", "--output_dir", required=True, help="Directory to store final outputs."
+        "-o", "--output_dir", default="./output", help="Directory to store final outputs. Default: './output'"
     )
     parser.add_argument(
-        "--zip_output", action="store_true", help="Whether to zip the output directory."
+        "--no-report", action="store_true", help="Skip generating an HTML report."
     )
     parser.add_argument(
         "--n_samples", type=int, default=5, help="Number of topic models to run with different seeds."
@@ -736,15 +704,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--temp_dir", type=str, default=None, help="Temporary directory for intermediate files."
     )
-    # Add report generation arguments
-    parser.add_argument(
-        "--generate_report", action="store_true", help="Generate an HTML report after pipeline completion."
-    )
-    parser.add_argument(
-        "--report_dir",
-        default=None,
-        help="(Ignored) Report directory is fixed to results/sphinx_builds."
-    )
     parser.add_argument(
         "--report_title", type=str, default=None, help="Title for the generated report."
     )
@@ -766,9 +725,7 @@ if __name__ == "__main__":
     
     pipeline.run(
         query_gene_set=args.query_gene_set, 
-        background_gene_list=args.background_gene_list, 
-        zip_output=args.zip_output,
-        generate_report=args.generate_report,
-        report_dir=args.report_dir,
+        background_gene_list=args.background_gene_list,
+        generate_report=not args.no_report,
         report_title=args.report_title
     )

@@ -159,8 +159,8 @@ def parse_args():
     
     parser.add_argument(
         "--report-dir",
-        default="./report",
-        help="Directory to store the generated report (default: ./report)"
+        default=None,
+        help="(Ignored) Report directory is fixed to results/sphinx_builds."
     )
     
     parser.add_argument(

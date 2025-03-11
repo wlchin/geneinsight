@@ -630,7 +630,7 @@ if __name__ == "__main__":
         "--num_topics", type=int, default=None, help="Number of topics to extract in topic modeling."
     )
     parser.add_argument(
-        "--pvalue_threshold", type=float, default=0.01, help="Adjusted P-value threshold for filtering results."
+        "--pvalue_threshold", type=float, default=0.05, help="Adjusted P-value threshold for filtering results."
     )
     parser.add_argument(
         "--api_service", type=str, default="openai", help="API service for topic refinement."

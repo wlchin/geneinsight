@@ -91,7 +91,11 @@ class Pipeline:
         # Create all subdirectories
         for dir_path in self.dirs.values():
             os.makedirs(dir_path, exist_ok=True)
-            
+        
+        # NEW: Create sphinx_builds directory as a subfolder in the results folder.
+        self.dirs["sphinx_builds"] = os.path.join(self.dirs["final"], "sphinx_builds")
+        os.makedirs(self.dirs["sphinx_builds"], exist_ok=True)
+        
         # Set timestamp for run
         self.timestamp = time.strftime("%Y%m%d_%H%M%S")
             
@@ -113,7 +117,7 @@ class Pipeline:
         Args:
             query_gene_set: Path to file containing query gene set
             background_gene_list: Path to file containing background gene list
-            zip_output: Whether to zip the output directory
+            zip_output: Whether to zip the output directory or zip file
             generate_report: Whether to generate an HTML report
             report_dir: Directory to store the generated report
             report_title: Title for the generated report
@@ -177,7 +181,7 @@ class Pipeline:
             logger.info("Step 9b: Clustering filtered topics")
             clustered_df = self._run_clustering(filtered_df)
 
-               # 9c. Perform ontology enrichment analysis
+            # 9c. Perform ontology enrichment analysis
             logger.info("Step 9c: Performing ontology enrichment analysis")
             ontology_dict_df = self._perform_ontology_enrichment(
                 summary_df=summary_df,
@@ -187,8 +191,6 @@ class Pipeline:
             )
             
             # Add ontology_dict_df to the finalize_outputs call
-            # Update your _finalize_outputs call in Step 10 to include the ontology dictionary:
-            # 10. Finalize outputs and cleanup
             logger.info("Step 10: Finalizing outputs")
             output_path = self._finalize_outputs(
                 run_id,
@@ -202,7 +204,7 @@ class Pipeline:
                     "enriched": enriched_df,
                     "key_topics": key_topics_df,
                     "clustered": clustered_df,
-                    "ontology_dict": ontology_dict_df,  # Add this line
+                    "ontology_dict": ontology_dict_df,
                 },
                 zip_output
             )
@@ -212,7 +214,7 @@ class Pipeline:
                 report_output = self._generate_report(
                     output_path=output_path,
                     query_gene_set=query_gene_set,
-                    report_dir=output_path,
+                    report_dir=report_dir,
                     report_title=report_title
                 )
                 if report_output:
@@ -459,7 +461,7 @@ class Pipeline:
         Args:
             output_path: Path to the pipeline output (directory or zip file)
             query_gene_set: Path to the query gene set file (used to derive the gene set name)
-            report_dir: Directory to store the generated report (if None, uses self.dirs["report"])
+            report_dir: Directory to store the generated report (ignored, using fixed sphinx_builds directory)
             report_title: (Unused) Title for the report generation process
 
         Returns:
@@ -470,15 +472,11 @@ class Pipeline:
         # Derive gene set name from the query_gene_set file name.
         gene_set = os.path.splitext(os.path.basename(query_gene_set))[0]
 
-        # Set report output folder.
-        if report_dir is None:
-            report_out_dir = self.dirs["report"]
-        else:
-            report_out_dir = os.path.abspath(report_dir)
-            os.makedirs(report_out_dir, exist_ok=True)
+        # Use the sphinx_builds directory inside results as the report output folder.
+        report_out_dir = self.dirs["sphinx_builds"]
+        os.makedirs(report_out_dir, exist_ok=True)
 
         # Determine the input folder for the report generation.
-        # If output_path is a zip file, extract it first.
         if os.path.isfile(output_path) and output_path.endswith('.zip'):
             import zipfile, shutil
             extract_dir = os.path.join(self.temp_dir, "extracted_report")
@@ -495,14 +493,12 @@ class Pipeline:
             logger.error("Output path for report generation is not valid.")
             return None
 
-        # Import and call the run_pipeline function from geneinsight.reports.pipeline.
         try:
             from .report import pipeline as reports_pipeline
         except ImportError as e:
             logger.error(f"Failed to import geneinsight.reports.pipeline: {e}")
             return None
 
-        # Call the report generation pipeline.
         status, html_index = reports_pipeline.run_pipeline(input_folder, report_out_dir, gene_set)
         if status and html_index:
             logger.info(f"Report generated successfully at {html_index}")
@@ -601,7 +597,6 @@ class Pipeline:
             output_dir=ontology_output_dir
         )
         
-        # Log information about the results
         logger.info(f"Ontology enrichment complete. Found {len(ontology_dict_df)} ontology dictionaries.")
         
         return ontology_dict_df
@@ -655,7 +650,9 @@ if __name__ == "__main__":
         "--generate_report", action="store_true", help="Generate an HTML report after pipeline completion."
     )
     parser.add_argument(
-        "--report_dir", type=str, default=None, help="Directory to store the generated report."
+        "--report_dir",
+        default=None,
+        help="(Ignored) Report directory is fixed to results/sphinx_builds."
     )
     parser.add_argument(
         "--report_title", type=str, default=None, help="Title for the generated report."

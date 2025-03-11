@@ -1,12 +1,8 @@
-#!/usr/bin/env python3
-"""
-Main pipeline module for the TopicGenes package.
-"""
-
 import os
 import time
 import logging
 import tempfile
+import shutil  # Added for directory operations
 from pathlib import Path
 import pandas as pd
 from typing import List, Dict, Any, Optional, Union
@@ -222,6 +218,10 @@ class Pipeline:
                 else:
                     logger.warning("Report generation failed or was skipped")
             
+            # 12. Reorganize the directory structure after processing
+            if os.path.isdir(output_path):
+                self._reorganize_output_directory(output_path)
+            
             logger.info(f"Pipeline completed successfully. Results available at: {output_path}")
             return output_path
             
@@ -242,6 +242,97 @@ class Pipeline:
                 shutil.rmtree(self.temp_dir)
             except Exception as e:
                 logger.warning(f"Error cleaning up temporary directory: {e}")
+    
+    def _reorganize_output_directory(self, output_path: str):
+        """
+        Reorganize the output directory structure at the results level:
+        1. Remove the ontology folder
+        2. Move sphinx_builds to top level
+        3. Remove the original sphinx_builds directory
+        4. Zip both remaining folders in the results directory
+        
+        Args:
+            output_path: Path to the run output directory
+        """
+        try:
+            # Get the results directory (one level above output_path)
+            results_dir = self.dirs["final"]
+            logger.info(f"Reorganizing output directory structure in: {results_dir}")
+            
+            # 1. Remove the ontology folder
+            ontology_path = os.path.join(results_dir, "ontology")
+            if os.path.exists(ontology_path):
+                logger.info(f"Removing ontology folder: {ontology_path}")
+                shutil.rmtree(ontology_path)
+            
+            # 2. Check if sphinx_builds exists and contains content to move
+            sphinx_source_path = os.path.join(results_dir, "sphinx_builds")
+            if os.path.exists(sphinx_source_path):
+                # The nested build directory we want to extract
+                sphinx_nested_builds = os.path.join(sphinx_source_path, "results", "sphinx_builds")
+                
+                # Check if the nested sphinx_builds directory exists
+                if os.path.exists(sphinx_nested_builds):
+                    # Create a temporary directory at the top level to avoid conflicts
+                    sphinx_temp_path = os.path.join(results_dir, "sphinx_builds_temp")
+                    
+                    # Copy nested sphinx_builds contents to temporary directory
+                    logger.info(f"Copying sphinx builds to top level: {sphinx_nested_builds} -> {sphinx_temp_path}")
+                    shutil.copytree(sphinx_nested_builds, sphinx_temp_path)
+                    
+                    # Remove the original sphinx_builds directory
+                    logger.info(f"Removing original sphinx_builds folder: {sphinx_source_path}")
+                    shutil.rmtree(sphinx_source_path)
+                    
+                    # Rename the temporary directory to sphinx_builds
+                    logger.info(f"Renaming temporary sphinx_builds folder to final location")
+                    os.rename(sphinx_temp_path, sphinx_source_path)
+                else:
+                    logger.warning(f"Nested sphinx_builds directory not found: {sphinx_nested_builds}")
+            else:
+                logger.warning(f"Sphinx builds directory not found: {sphinx_source_path}")
+            
+            # 4. Zip both remaining folders in the results directory
+            self._zip_results_folders(results_dir)
+                
+            logger.info("Output directory reorganization completed")
+            
+        except Exception as e:
+            logger.error(f"Error reorganizing output directory: {e}", exc_info=True)
+            # Continue with pipeline execution even if reorganization fails
+            
+    def _zip_results_folders(self, results_dir: str):
+        """
+        Zip each folder within the results directory.
+        
+        Args:
+            results_dir: Path to the results directory
+        """
+        from .utils.zip_helper import zip_directory
+        
+        try:
+            logger.info("Zipping folders in results directory")
+            
+            # Get a list of all directories in the results directory (excluding files)
+            dirs_to_zip = [d for d in os.listdir(results_dir) 
+                          if os.path.isdir(os.path.join(results_dir, d))]
+            
+            for dir_name in dirs_to_zip:
+                dir_path = os.path.join(results_dir, dir_name)
+                zip_path = os.path.join(results_dir, f"{dir_name}.zip")
+                
+                logger.info(f"Zipping directory: {dir_path} -> {zip_path}")
+                zip_directory(dir_path, zip_path)
+                
+                # Remove the original directory after zipping
+                logger.info(f"Removing original directory: {dir_path}")
+                shutil.rmtree(dir_path)
+                
+            logger.info(f"Zipped {len(dirs_to_zip)} directories in results folder")
+            
+        except Exception as e:
+            logger.error(f"Error zipping results folders: {e}", exc_info=True)
+            # Continue with pipeline execution even if zipping fails
     
     def _get_stringdb_enrichment(self, query_gene_set: str) -> tuple:
         """Get gene enrichment data from StringDB."""

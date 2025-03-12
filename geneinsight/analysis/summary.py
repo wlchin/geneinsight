@@ -8,7 +8,6 @@ import torch
 from sentence_transformers import SentenceTransformer, util
 from collections import Counter
 from dotenv import load_dotenv
-import pickle
 
 # Configure logging
 logging.basicConfig(
@@ -195,20 +194,6 @@ class RAGModule:
 
         logging.info("Exiting to_markdown().")
         return "\n".join(md_lines)
-
-    def save_to_pickle(self, filename):
-        logging.info("Entering save_to_pickle() with filename='%s'", filename)
-        with open(filename, "wb") as f:
-            pickle.dump(self, f)
-        logging.info("RAGModule object saved to pickle file '%s'.", filename)
-
-    @staticmethod
-    def load_from_pickle(filename):
-        logging.info("Entering load_from_pickle() with filename='%s'", filename)
-        with open(filename, "rb") as f:
-            obj = pickle.load(f)
-        logging.info("RAGModule object loaded from pickle file '%s'.", filename)
-        return obj
 
 def read_input_files(enrichment_csv: str, minor_topics_csv: str):
     df = pd.read_csv(enrichment_csv)

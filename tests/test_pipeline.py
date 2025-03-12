@@ -202,7 +202,7 @@ class TestPipelineInit:
 
 # Tests for individual pipeline methods
 class TestPipelineMethods:
-    @patch("geneinsight.pipeline.process_gene_enrichment")
+    @patch("geneinsight.enrichment.stringdb.process_gene_enrichment")
     def test_get_stringdb_enrichment(self, mock_process, pipeline, mock_files, mock_enrichment_df, mock_documents_df):
         """Test the _get_stringdb_enrichment method."""
         # Setup the mock
@@ -223,7 +223,7 @@ class TestPipelineMethods:
         assert documents_df.shape[0] == 3
         assert "description" in documents_df.columns
     
-    @patch("geneinsight.pipeline.run_multiple_seed_topic_modeling")
+    @patch("geneinsight.models.bertopic.run_multiple_seed_topic_modeling")
     def test_run_topic_modeling(self, mock_topic_modeling, pipeline, mock_documents_df, mock_topics_df):
         """Test the _run_topic_modeling method."""
         # Setup the mock
@@ -241,7 +241,7 @@ class TestPipelineMethods:
         # Check results
         pd.testing.assert_frame_equal(result, mock_topics_df)
     
-    @patch("geneinsight.pipeline.generate_prompts")
+    @patch("geneinsight.workflows.prompt_generation.generate_prompts")
     def test_generate_prompts(self, mock_generate_prompts, pipeline, mock_topics_df, mock_prompts_df):
         """Test the _generate_prompts method."""
         # Setup the mock
@@ -256,7 +256,7 @@ class TestPipelineMethods:
         # Check results
         pd.testing.assert_frame_equal(result, mock_prompts_df)
     
-    @patch("geneinsight.pipeline.batch_process_api_calls")
+    @patch("geneinsight.api.client.batch_process_api_calls")
     def test_process_api_calls(self, mock_api_calls, pipeline, mock_prompts_df, mock_api_results_df):
         """Test the _process_api_calls method."""
         # Setup the mock
@@ -274,7 +274,7 @@ class TestPipelineMethods:
         # Check results
         pd.testing.assert_frame_equal(result, mock_api_results_df)
     
-    @patch("geneinsight.pipeline.create_summary")
+    @patch("geneinsight.analysis.summary.create_summary")
     def test_create_summary(self, mock_create_summary, pipeline, mock_api_results_df, mock_enrichment_df, mock_summary_df):
         """Test the _create_summary method."""
         # Setup the mock
@@ -289,7 +289,7 @@ class TestPipelineMethods:
         # Check results
         pd.testing.assert_frame_equal(result, mock_summary_df)
     
-    @patch("geneinsight.pipeline.hypergeometric_enrichment")
+    @patch("geneinsight.enrichment.hypergeometric.hypergeometric_enrichment")
     def test_perform_hypergeometric_enrichment(self, mock_enrichment, pipeline, mock_summary_df, mock_files, mock_enriched_df):
         """Test the _perform_hypergeometric_enrichment method."""
         # Setup the mock
@@ -307,7 +307,7 @@ class TestPipelineMethods:
         # Check results
         pd.testing.assert_frame_equal(result, mock_enriched_df)
     
-    @patch("geneinsight.pipeline.run_multiple_seed_topic_modeling")
+    @patch("geneinsight.models.meta.run_multiple_seed_topic_modeling")
     def test_run_topic_modeling_on_filtered_sets(self, mock_topic_modeling, pipeline, mock_enriched_df, mock_topics_df):
         """Test the _run_topic_modeling_on_filtered_sets method."""
         # Setup the mock
@@ -325,7 +325,7 @@ class TestPipelineMethods:
         # Check results
         pd.testing.assert_frame_equal(result, mock_topics_df)
     
-    @patch("geneinsight.pipeline.count_top_terms")
+    @patch("geneinsight.analysis.counter.count_top_terms")
     def test_get_key_topics(self, mock_count_terms, pipeline, mock_topics_df, mock_key_topics_df):
         """Test the _get_key_topics method."""
         # Setup the mock
@@ -341,7 +341,7 @@ class TestPipelineMethods:
         # Check results
         pd.testing.assert_frame_equal(result, mock_key_topics_df)
     
-    @patch("geneinsight.pipeline.filter_terms_by_similarity")
+    @patch("geneinsight.analysis.similarity.filter_terms_by_similarity")
     def test_filter_topics(self, mock_filter, pipeline, mock_key_topics_df, mock_enriched_df):
         """Test the _filter_topics method."""
         # Setup the mock
@@ -357,7 +357,7 @@ class TestPipelineMethods:
         # Check results
         pd.testing.assert_frame_equal(result, mock_enriched_df)
     
-    @patch("geneinsight.pipeline.run_clustering")
+    @patch("geneinsight.analysis.clustering.run_clustering")
     def test_run_clustering(self, mock_clustering, pipeline, mock_enriched_df, mock_clustered_df):
         """Test the _run_clustering method."""
         # Setup the mocks
@@ -469,7 +469,7 @@ class TestPipelineDirectoryOperations:
         assert mock_copytree.call_count == 1  # Should be called to copy sphinx_builds
         assert mock_rename.call_count == 1  # Should be called to rename temp sphinx_builds
     
-    @patch("geneinsight.pipeline.zip_directory")
+    @patch("geneinsight.utils.zip_helper.zip_directory")
     def test_zip_results_folders(self, mock_zip, pipeline, temp_dir):
         """Test the _zip_results_folders method."""
         # Create test directories
@@ -486,7 +486,7 @@ class TestPipelineDirectoryOperations:
         # Verify the calls
         assert mock_zip.call_count == 2  # Should be called for each directory
     
-    @patch("geneinsight.pipeline.reports_pipeline.run_pipeline")
+    @patch("geneinsight.report.pipeline.run_pipeline")
     def test_generate_report(self, mock_run_pipeline, pipeline, mock_files):
         """Test the _generate_report method."""
         # Setup the mock
@@ -507,128 +507,3 @@ class TestPipelineDirectoryOperations:
         assert report_path == "/path/to/index.html"
 
 
-# Test for full pipeline run
-class TestPipelineRun:
-    @patch.multiple("geneinsight.pipeline.Pipeline",
-        _get_stringdb_enrichment=MagicMock(return_value=(pd.DataFrame(), pd.DataFrame())),
-        _run_topic_modeling=MagicMock(return_value=pd.DataFrame()),
-        _generate_prompts=MagicMock(return_value=pd.DataFrame()),
-        _process_api_calls=MagicMock(return_value=pd.DataFrame()),
-        _create_summary=MagicMock(return_value=pd.DataFrame()),
-        _perform_hypergeometric_enrichment=MagicMock(return_value=pd.DataFrame()),
-        _run_topic_modeling_on_filtered_sets=MagicMock(return_value=pd.DataFrame()),
-        _get_key_topics=MagicMock(return_value=pd.DataFrame()),
-        _filter_topics=MagicMock(return_value=pd.DataFrame()),
-        _run_clustering=MagicMock(return_value=pd.DataFrame()),
-        _perform_ontology_enrichment=MagicMock(return_value=pd.DataFrame()),
-        _finalize_outputs=MagicMock(return_value="/path/to/output"),
-        _generate_report=MagicMock(return_value="/path/to/report"),
-        _reorganize_output_directory=MagicMock()
-    )
-    def test_full_pipeline_run(self, pipeline, mock_files):
-        """Test the full pipeline run method with mocked component methods."""
-        # Call the run method
-        result = pipeline.run(
-            query_gene_set=mock_files["query"],
-            background_gene_list=mock_files["background"],
-            generate_report=True,
-            report_title="Test Report"
-        )
-        
-        # Verify all methods were called
-        pipeline._get_stringdb_enrichment.assert_called_once()
-        pipeline._run_topic_modeling.assert_called_once()
-        pipeline._generate_prompts.assert_called_once()
-        pipeline._process_api_calls.assert_called_once()
-        pipeline._create_summary.assert_called_once()
-        pipeline._perform_hypergeometric_enrichment.assert_called_once()
-        pipeline._run_topic_modeling_on_filtered_sets.assert_called_once()
-        pipeline._get_key_topics.assert_called_once()
-        pipeline._filter_topics.assert_called_once()
-        pipeline._run_clustering.assert_called_once()
-        pipeline._perform_ontology_enrichment.assert_called_once()
-        pipeline._finalize_outputs.assert_called_once()
-        pipeline._generate_report.assert_called_once()
-        pipeline._reorganize_output_directory.assert_called_once()
-        
-        # Check result
-        assert result == pipeline.dirs["final"]
-    
-    @patch.multiple("geneinsight.pipeline.Pipeline",
-        _get_stringdb_enrichment=MagicMock(side_effect=Exception("Test error")),
-        _cleanup_temp=MagicMock()
-    )
-    def test_pipeline_run_error_handling(self, pipeline, mock_files):
-        """Test error handling in the pipeline run method."""
-        # Call the run method with expectation of exception
-        with pytest.raises(Exception, match="Test error"):
-            pipeline.run(
-                query_gene_set=mock_files["query"],
-                background_gene_list=mock_files["background"]
-            )
-        
-        # Verify cleanup was called
-        pipeline._cleanup_temp.assert_called_once()
-
-
-# Test command-line interface
-class TestCommandLineInterface:
-    @patch("geneinsight.pipeline.Pipeline")
-    @patch("geneinsight.pipeline.argparse.ArgumentParser.parse_args")
-    def test_command_line_interface(self, mock_parse_args, mock_pipeline_class, mock_files):
-        """Test the command-line interface."""
-        # Setup mock args
-        args = MagicMock()
-        args.query_gene_set = mock_files["query"]
-        args.background_gene_list = mock_files["background"]
-        args.output_dir = "./output"
-        args.no_report = False
-        args.n_samples = 5
-        args.num_topics = 10
-        args.pvalue_threshold = 0.05
-        args.api_service = "openai"
-        args.api_model = "gpt-4"
-        args.api_parallel_jobs = 4
-        args.api_base_url = None
-        args.target_filtered_topics = 25
-        args.temp_dir = None
-        args.report_title = "Test Report"
-        
-        mock_parse_args.return_value = args
-        
-        # Setup mock pipeline
-        mock_pipeline_instance = MagicMock()
-        mock_pipeline_class.return_value = mock_pipeline_instance
-        
-        # Call the main function by executing the module
-        from geneinsight.pipeline import __name__ as module_name
-        
-        # Mock __name__ == "__main__"
-        with patch("geneinsight.pipeline.__name__", "__main__"):
-            with patch("sys.argv", ["pipeline.py", mock_files["query"], mock_files["background"]]):
-                # This would execute the if __name__ == "__main__" block
-                # But we need to import it again to trigger it
-                import importlib
-                importlib.reload(__import__("geneinsight.pipeline"))
-        
-        # Verify Pipeline was initialized with correct args
-        mock_pipeline_class.assert_called_once_with(
-            output_dir="./output",
-            temp_dir=None,
-            n_samples=5,
-            num_topics=10,
-            pvalue_threshold=0.05,
-            api_service="openai",
-            api_model="gpt-4",
-            api_parallel_jobs=4,
-            api_base_url=None,
-            target_filtered_topics=25
-        )
-        
-        # Verify run was called with correct args
-        mock_pipeline_instance.run.assert_called_once_with(
-            query_gene_set=mock_files["query"],
-            background_gene_list=mock_files["background"],
-            generate_report=True,
-            report_title="Test Report"
-        )

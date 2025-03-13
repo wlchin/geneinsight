@@ -46,7 +46,7 @@ def main():
 
     # New argument for controlling verbosity
     parser.add_argument("-v", "--verbosity",
-                        default="info",
+                        default="none",
                         choices=["none", "debug", "info", "warning", "error", "critical"],
                         help="Set logging verbosity. Use 'none' to disable logging. Default is 'info'.")
 

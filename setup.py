@@ -8,13 +8,13 @@ from setuptools import setup, find_packages
 # Package meta-data
 NAME = 'geneinsight'
 DESCRIPTION = 'Topic modeling pipeline for gene sets with enrichment analysis'
-URL = 'https://github.com/yourusername/geneinsight'
+URL = 'https://github.com/wlchin/geneinsight'
 EMAIL = 'your.email@example.com'
 AUTHOR = 'Your Name'
 REQUIRES_PYTHON = '>=3.9'
 VERSION = '0.1.0'
 
-# Required packages
+# Core required packages
 REQUIRED = [
     'pandas>=2.0.0',
     'bertopic>=0.15.0',
@@ -27,17 +27,27 @@ REQUIRED = [
     'gseapy>=1.1.0',
     'joblib>=1.3.0',
     'optuna>=3.3.0',
-    'stringdb>=0.1.3',
+    'stringdb>=0.1.5',  # Updated to match requirements.txt version
     'pydantic>=2.4.0',
-    'rich>=13.6.0',
+    'rich>=13.9.4',     # Updated to match requirements.txt version
     'typer>=0.9.0',
     'pyyaml>=6.0',
-    'seaborn>=0.12.0',  # Added seaborn dependency
-    'colorcet>=1.0.0',  # Added colorcet dependency
-    'torch>=1.7.0',  # Needed for sentence-transformers in ontology module
+    'seaborn>=0.12.0',
+    'colorcet>=3.0.0',  # Updated to match requirements.txt version
+    'torch>=1.7.0',     # Needed for sentence-transformers in ontology module
 ]
 
-# Optional packages
+# Visualization and reporting packages
+REPORT_PACKAGES = [
+    'umap-learn>=0.5.0',
+    'plotly>=5.9.0',
+    'sphinx>=4.3.0',
+    'pillow>=9.0.0',
+    'sphinx-wagtail-theme>=6.5.0',
+    'sphinx-togglebutton>=0.3.2',
+]
+
+# Additional packages
 EXTRAS = {
     'dev': [
         'pytest>=7.3.1',
@@ -45,6 +55,9 @@ EXTRAS = {
         'isort>=5.12.0',
         'flake8>=6.0.0',
     ],
+    'report': REPORT_PACKAGES,
+    'ollama': ['ollama>=0.28.1'],
+    'all': ['ollama>=0.28.1'] + REPORT_PACKAGES,
 }
 
 # The rest of the setup code

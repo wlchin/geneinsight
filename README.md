@@ -147,7 +147,48 @@ To customize the report, use the `--report_title` parameter.
 
 ## Running Individual Steps
 
-Geneinsight provides a complete pipeline, but you can also run individual components as needed for your workflow. See the documentation for more details on running specific steps.
+Geneinsight provides individual command-line tools for running each step of the pipeline separately:
+
+### 1. StringDB Enrichment
+```bash
+geneinsight-enrichment gene_list.txt -o ./output -m single
+```
+
+### 2. Topic Modeling
+```bash
+geneinsight-topic ./output/gene_list__documents.csv -o ./output/topics.csv -n 5 -k 10
+```
+
+### 3. Prompt Generation
+```bash
+geneinsight-prompt ./output/topics.csv -o ./output/prompts.csv -n 5 -w 10
+```
+
+### 4. API Processing
+```bash
+geneinsight-api ./output/prompts.csv -o ./output/api_results.csv --service openai --model gpt-4o-mini
+```
+
+### 5. Hypergeometric Enrichment
+```bash
+geneinsight-hypergeometric ./output/api_results.csv gene_list.txt background_genes.txt -o ./output/enriched.csv -p 0.05
+```
+
+### 6. Topic Filtering
+```bash
+geneinsight-filter ./output/enriched.csv -o ./output/filtered_topics.csv -t 25
+```
+
+### 7. Report Generation
+```bash
+geneinsight-report ./output -o ./report --title "My Gene Analysis"
+```
+
+This modular approach gives you complete control over the pipeline and allows you to:
+- Experiment with different parameters at each stage
+- Resume processing from any point if a step fails
+- Run only the specific steps you need
+- Integrate individual steps into your own workflows
 
 ## License
 

@@ -497,10 +497,6 @@ def test_ragmodule_format_top_documents_with_empty_indices():
 
 @pytest.mark.parametrize("invalid_indices", [[0, 999], [999], [-1]])
 def test_ragmodule_format_top_documents_out_of_bounds(invalid_indices, caplog):
-    """
-    Test that format_top_documents logs a warning and returns empty results 
-    if we pass invalid index positions (e.g., out of range or negative).
-    """
     rag_module = RAGModuleGSEAPY(ontology_object_list=[])
     rag_module.enrichr_results = pd.DataFrame({
         "Term": ["TermA", "TermB"],
@@ -511,9 +507,13 @@ def test_ragmodule_format_top_documents_out_of_bounds(invalid_indices, caplog):
     with caplog.at_level(logging.WARNING):
         formatted_str, filtered_df = rag_module.format_top_documents(invalid_indices)
 
-    # We should see a warning about out-of-bounds
-    assert "IndexError: Attempted to index out-of-bounds" in caplog.text
-    # Both return values should be empty
+    # If we used negative indices, check for negative index log:
+    if any(x < 0 for x in invalid_indices):
+        assert "IndexError: Negative indices are disallowed." in caplog.text
+    else:
+        assert "IndexError: Attempted to index out-of-bounds" in caplog.text
+
+    # Also confirm empty results
     assert formatted_str == ""
     assert filtered_df.empty
 

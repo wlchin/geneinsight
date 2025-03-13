@@ -44,7 +44,7 @@ class TestGeneInsightCLI:
             'pvalue_threshold': 0.05,
             'api_service': 'openai',
             'api_model': 'gpt-4o-mini',
-            'api_parallel_jobs': 50,
+            'api_parallel_jobs': 1,
             'api_base_url': None,
             'target_filtered_topics': 25,
             'species': 9606

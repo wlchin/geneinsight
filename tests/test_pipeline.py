@@ -605,3 +605,157 @@ class TestPipelineDirectoryOperations:
         # Verify the call
         mock_run_pipeline.assert_called_once()
         assert report_path == "/path/to/index.html"
+
+class TestPipelineRun:
+    def test_run_success(self, pipeline, mock_files, mock_enrichment_df, mock_documents_df,
+                        mock_topics_df, mock_prompts_df, mock_api_results_df, mock_summary_df,
+                        mock_enriched_df, mock_key_topics_df, mock_clustered_df, mock_ontology_dict_df):
+        """
+        Test a full successful run of the pipeline.
+        All internal methods are patched to return dummy data.
+        Also, simulate the case where the first call to _filter_topics returns a small DF so that the
+        pipeline re-calls it with the enriched DF.
+        """
+        # Create dummy DataFrames to simulate filtering outcomes
+        small_df = pd.DataFrame([{"dummy": 1}] * 5)  # fewer than target (target is 25 by default)
+        large_df = pd.DataFrame([{"dummy": 1}] * 25)  # meets target
+
+        with patch.object(pipeline, '_get_stringdb_enrichment', return_value=(mock_enrichment_df, mock_documents_df)) as mock_get_stringdb, \
+            patch.object(pipeline, '_run_topic_modeling', return_value=mock_topics_df) as mock_topic_modeling, \
+            patch.object(pipeline, '_run_topic_modeling_on_filtered_sets', return_value=mock_topics_df) as mock_topic_modeling_on_filtered_sets, \
+            patch.object(pipeline, '_generate_prompts', return_value=mock_prompts_df) as mock_generate_prompts, \
+            patch.object(pipeline, '_process_api_calls', return_value=mock_api_results_df) as mock_process_api, \
+            patch.object(pipeline, '_create_summary', return_value=mock_summary_df) as mock_create_summary, \
+            patch.object(pipeline, '_perform_hypergeometric_enrichment', return_value=mock_enriched_df) as mock_hypergeom, \
+            patch.object(pipeline, '_get_key_topics', return_value=mock_key_topics_df) as mock_key_topics, \
+            patch.object(pipeline, '_filter_topics', side_effect=[small_df, large_df]) as mock_filter, \
+            patch.object(pipeline, '_run_clustering', return_value=mock_clustered_df) as mock_cluster, \
+            patch.object(pipeline, '_perform_ontology_enrichment', return_value=mock_ontology_dict_df) as mock_ontology, \
+            patch.object(pipeline, '_finalize_outputs', return_value="dummy_run_dir") as mock_finalize, \
+            patch.object(pipeline, '_generate_report', return_value="/dummy/report/index.html") as mock_report, \
+            patch.object(pipeline, '_reorganize_output_directory') as mock_reorganize, \
+            patch.object(pipeline, '_cleanup_temp') as mock_cleanup, \
+            patch("geneinsight.pipeline.os.path.isdir", return_value=True) as mock_isdir:
+
+            output = pipeline.run(
+                query_gene_set=mock_files["query"],
+                background_gene_list=mock_files["background"],
+                generate_report=True,
+                report_title="Test Report"
+            )
+
+            # Verify that the patched methods were called as expected
+            mock_get_stringdb.assert_called_once_with(mock_files["query"])
+            mock_topic_modeling.assert_called_once()  # Called for initial topic modeling
+            mock_topic_modeling_on_filtered_sets.assert_called_once()  # Called on filtered sets
+            mock_generate_prompts.assert_called_once_with(mock_topics_df)
+            mock_process_api.assert_called_once_with(mock_prompts_df)
+            # Expecting only two arguments since the pipeline calls _create_summary(api_results_df, enrichment_df)
+            mock_create_summary.assert_called_once_with(mock_api_results_df, mock_enrichment_df)
+            mock_hypergeom.assert_called_once()
+            mock_key_topics.assert_called_once_with(mock_topics_df)
+            assert mock_filter.call_count == 2
+            mock_cluster.assert_called_once_with(large_df)
+            mock_ontology.assert_called_once()
+            mock_finalize.assert_called_once()
+            mock_report.assert_called_once()
+            # Now that os.path.isdir returns True, _reorganize_output_directory should be called
+            mock_reorganize.assert_called_once_with("dummy_run_dir")
+            mock_cleanup.assert_called_once()
+
+            # The run() method returns self.dirs["final"]
+            assert output == pipeline.dirs["final"]
+
+
+    def test_run_no_report(self, pipeline, mock_files, mock_enrichment_df, mock_documents_df,
+                           mock_topics_df, mock_prompts_df, mock_api_results_df, mock_summary_df,
+                           mock_enriched_df, mock_key_topics_df, mock_clustered_df, mock_ontology_dict_df):
+        """
+        Test a successful run when generate_report is False.
+        Verify that _generate_report is not called.
+        """
+        with patch.object(pipeline, '_get_stringdb_enrichment', return_value=(mock_enrichment_df, mock_documents_df)), \
+             patch.object(pipeline, '_run_topic_modeling', side_effect=[mock_topics_df, mock_topics_df]), \
+             patch.object(pipeline, '_generate_prompts', return_value=mock_prompts_df), \
+             patch.object(pipeline, '_process_api_calls', return_value=mock_api_results_df), \
+             patch.object(pipeline, '_create_summary', return_value=mock_summary_df), \
+             patch.object(pipeline, '_perform_hypergeometric_enrichment', return_value=mock_enriched_df), \
+             patch.object(pipeline, '_get_key_topics', return_value=mock_key_topics_df), \
+             patch.object(pipeline, '_filter_topics', side_effect=[(pd.DataFrame([{"dummy": 1}] * 5)), (pd.DataFrame([{"dummy": 1}] * 25))]), \
+             patch.object(pipeline, '_run_clustering', return_value=mock_clustered_df), \
+             patch.object(pipeline, '_perform_ontology_enrichment', return_value=mock_ontology_dict_df), \
+             patch.object(pipeline, '_finalize_outputs', return_value="dummy_run_dir"), \
+             patch.object(pipeline, '_generate_report') as mock_report, \
+             patch.object(pipeline, '_reorganize_output_directory'), \
+             patch.object(pipeline, '_cleanup_temp'):
+            
+            output = pipeline.run(
+                query_gene_set=mock_files["query"],
+                background_gene_list=mock_files["background"],
+                generate_report=False
+            )
+            
+            mock_report.assert_not_called()
+            assert output == pipeline.dirs["final"]
+
+    def test_run_no_overlap(self, temp_dir, output_dir):
+        """
+        Test that run() aborts when there is no overlap between the query and background gene sets.
+        """
+        # Create a query file with one gene and a background file with different genes.
+        query_file = os.path.join(temp_dir, "query_no_overlap.txt")
+        with open(query_file, "w") as f:
+            f.write("GENE_A\n")
+        background_file = os.path.join(temp_dir, "background_no_overlap.txt")
+        with open(background_file, "w") as f:
+            f.write("GENE_B\nGENE_C\n")
+        
+        pipeline_instance = Pipeline(output_dir=output_dir)
+        with pytest.raises(ValueError, match="No overlap found between query gene set and background"):
+            pipeline_instance.run(query_gene_set=query_file, background_gene_list=background_file)
+
+    def test_run_empty_enriched(self, pipeline, mock_files, mock_enrichment_df, mock_documents_df,
+                                mock_topics_df, mock_prompts_df, mock_api_results_df, mock_summary_df):
+        """
+        Test that run() raises a ValueError when _perform_hypergeometric_enrichment returns an empty DataFrame.
+        """
+        empty_df = pd.DataFrame()
+        with patch.object(pipeline, '_get_stringdb_enrichment', return_value=(mock_enrichment_df, mock_documents_df)), \
+             patch.object(pipeline, '_run_topic_modeling', return_value=mock_topics_df), \
+             patch.object(pipeline, '_generate_prompts', return_value=mock_prompts_df), \
+             patch.object(pipeline, '_process_api_calls', return_value=mock_api_results_df), \
+             patch.object(pipeline, '_create_summary', return_value=mock_summary_df), \
+             patch.object(pipeline, '_perform_hypergeometric_enrichment', return_value=empty_df):
+            
+            with pytest.raises(ValueError, match="Hypergeometric enrichment resulted in an empty DataFrame"):
+                pipeline.run(query_gene_set=mock_files["query"], background_gene_list=mock_files["background"])
+
+    def test_run_report_fail(self, pipeline, mock_files, mock_enrichment_df, mock_documents_df,
+                             mock_topics_df, mock_prompts_df, mock_api_results_df, mock_summary_df,
+                             mock_enriched_df, mock_key_topics_df, mock_clustered_df):
+        """
+        Test a run where report generation fails (i.e. _generate_report returns None).
+        The pipeline should continue running and still return the output directory.
+        """
+        with patch.object(pipeline, '_get_stringdb_enrichment', return_value=(mock_enrichment_df, mock_documents_df)), \
+             patch.object(pipeline, '_run_topic_modeling', side_effect=[mock_topics_df, mock_topics_df]), \
+             patch.object(pipeline, '_generate_prompts', return_value=mock_prompts_df), \
+             patch.object(pipeline, '_process_api_calls', return_value=mock_api_results_df), \
+             patch.object(pipeline, '_create_summary', return_value=mock_summary_df), \
+             patch.object(pipeline, '_perform_hypergeometric_enrichment', return_value=mock_enriched_df), \
+             patch.object(pipeline, '_get_key_topics', return_value=mock_key_topics_df), \
+             patch.object(pipeline, '_filter_topics', side_effect=[(pd.DataFrame([{"dummy": 1}] * 5)), (pd.DataFrame([{"dummy": 1}] * 25))]), \
+             patch.object(pipeline, '_run_clustering', return_value=mock_clustered_df), \
+             patch.object(pipeline, '_perform_ontology_enrichment', return_value=mock_enriched_df), \
+             patch.object(pipeline, '_finalize_outputs', return_value="dummy_run_dir"), \
+             patch.object(pipeline, '_generate_report', return_value=None) as mock_report, \
+             patch.object(pipeline, '_reorganize_output_directory'), \
+             patch.object(pipeline, '_cleanup_temp'):
+            
+            output = pipeline.run(
+                query_gene_set=mock_files["query"],
+                background_gene_list=mock_files["background"],
+                generate_report=True
+            )
+            mock_report.assert_called_once()
+            assert output == pipeline.dirs["final"]

@@ -25,6 +25,20 @@ def mock_ontology_folder(tmp_path):
 
 
 @pytest.fixture
+def empty_ontology_folder(tmp_path):
+    """
+    Create an empty folder (or with invalid files) to test 'no valid ontology files' scenario.
+    """
+    folder = tmp_path / "empty_ontology"
+    folder.mkdir()
+    
+    # Optionally, create hidden or invalid files to ensure the code
+    # doesn't find any "valid" ontologies.
+    (folder / ".hidden_file").write_text("hidden content")
+    return str(folder)
+
+
+@pytest.fixture
 def mock_data_files(tmp_path):
     """
     Create mock CSV files for summary, filter, and gene files.
@@ -100,6 +114,38 @@ def test_init_with_invalid_folder(tmp_path):
         OntologyWorkflow(ontology_folder=non_existent)
 
 
+def test_init_no_folder_and_no_default():
+    """
+    Test that if ontology_folder=None and the default package location is missing,
+    a ValueError is raised.
+    We mock out import to simulate a missing package resource.
+    """
+    with patch("geneinsight.ontology.workflow.pkg_resources.files", side_effect=AttributeError("No default folder")):
+        with pytest.raises(ValueError, match="No ontology folder provided and default not found"):
+            OntologyWorkflow(ontology_folder=None)
+
+
+# -----------------------------------------------------
+# Test no valid ontology files found (empty folder case)
+# -----------------------------------------------------
+def test_no_valid_ontology_files(empty_ontology_folder):
+    """
+    If no valid (non-hidden) files are found in the ontology folder,
+    the constructor runs fine, but run_ontology_enrichment should fail.
+    """
+    workflow = OntologyWorkflow(ontology_folder=empty_ontology_folder, use_temp_files=False)
+    
+    # Attempt to run the enrichment with an empty folder
+    with pytest.raises(ValueError, match="No valid ontology files found"):
+        workflow.run_ontology_enrichment(
+            summary_csv="dummy_summary.csv",
+            gene_origin="dummy_gene_origin.txt",
+            background_genes="dummy_background.txt",
+            filter_csv="dummy_filter.csv",
+            output_csv="dummy_output.csv"
+        )
+
+
 # ----------------------------------
 # Tests for run_ontology_enrichment
 # ----------------------------------
@@ -153,6 +199,30 @@ def test_run_ontology_enrichment(
     # Check that the RAGModuleGSEAPY was called
     assert mock_rag_class.called, "RAGModuleGSEAPY should have been instantiated."
     assert mock_rag_instance.get_top_documents.called, "get_top_documents should have been called on the RAG instance."
+
+
+def test_run_ontology_enrichment_no_background_file(mock_ontology_workflow, mock_data_files):
+    """
+    If background_genes is not a valid file path, it should simply skip loading the background genes.
+    """
+    non_existent_bg = "this_file_does_not_exist.txt"
+    output_csv = os.path.join(str(Path(mock_data_files["summary_csv"]).parent), "results_no_bg.csv")
+
+    # We don't mock the entire RAGModule because we're specifically testing the absent background file logic.
+    # But we do need to ensure the ontology reading step won't fail. We'll patch the reading method.
+    with patch("geneinsight.ontology.workflow.OntologyReader", MagicMock()), \
+         patch("geneinsight.ontology.workflow.RAGModuleGSEAPY.get_top_documents", 
+               return_value=([], {}, pd.DataFrame(), pd.DataFrame(), "")):
+        df_result = mock_ontology_workflow.run_ontology_enrichment(
+            summary_csv=mock_data_files["summary_csv"],
+            gene_origin=mock_data_files["gene_origin_txt"],
+            background_genes=non_existent_bg,
+            filter_csv=mock_data_files["filter_csv"],
+            output_csv=output_csv
+        )
+
+    assert os.path.exists(output_csv), "Output CSV should be created even with missing background file."
+    assert isinstance(df_result, pd.DataFrame)
 
 
 # ----------------------------------
@@ -263,6 +333,89 @@ def test_process_dataframes(
     assert set(called_queries) == {"TermX", "TermY"}, "Should be called for TermX and TermY only."
 
 
+def test_process_dataframes_no_matches(mock_ontology_workflow, tmp_path):
+    """
+    Test process_dataframes when there are no matching terms in summary_df and clustered_df.
+    Should result in empty enrichment DataFrame.
+    """
+    summary_df = pd.DataFrame({
+        "query": ["TermA", "TermB"],
+        "unique_genes": [
+            '{"GENE1":1}',
+            '{"GENE2":1}'
+        ]
+    })
+    # No overlapping terms with summary_df
+    clustered_df = pd.DataFrame({
+        "Term": ["TermX", "TermY"]
+    })
+
+    gene_list = tmp_path / "gene_list.txt"
+    gene_list.write_text("GENE1\nGENE2\n")
+
+    background_genes = tmp_path / "background_list.txt"
+    background_genes.write_text("BG1\nBG2\n")
+
+    enrichment_df, ontology_dict_df = mock_ontology_workflow.process_dataframes(
+        summary_df=summary_df,
+        clustered_df=clustered_df,
+        gene_list_path=str(gene_list),
+        background_genes_path=str(background_genes)
+    )
+
+    assert enrichment_df.empty, "Enrichment DataFrame should be empty if no matching terms."
+    assert ontology_dict_df.empty, "Ontology dictionary DataFrame should also be empty."
+
+
+# ----------------------------------------------
+# Test using temp files for intermediate results
+# ----------------------------------------------
+def test_process_dataframes_with_temp_files(mock_ontology_folder, tmp_path):
+    """
+    Test process_dataframes using the temp file option.
+    Ensures files are written to a temporary directory and cleaned up.
+    """
+    workflow = OntologyWorkflow(
+        ontology_folder=mock_ontology_folder,
+        fdr_threshold=0.1,
+        use_temp_files=True
+    )
+
+    # Prepare minimal DataFrames in memory
+    summary_df = pd.DataFrame({
+        "query": ["TermAlpha"],
+        "unique_genes": [
+            '{"GENE9":1}'
+        ]
+    })
+    clustered_df = pd.DataFrame({"Term": ["TermAlpha"]})
+
+    # Create dummy gene list and background gene list
+    gene_list = tmp_path / "gene_list.txt"
+    gene_list.write_text("GENE9\n")
+
+    background_genes = tmp_path / "background_list.txt"
+    background_genes.write_text("BG1\n")
+
+    # Patch out the RAGModule so we don't fail on actual ontology reading
+    with patch("geneinsight.ontology.workflow.OntologyReader", MagicMock()), \
+         patch("geneinsight.ontology.workflow.RAGModuleGSEAPY.get_top_documents",
+               return_value=([], {}, pd.DataFrame(), pd.DataFrame(), "")), \
+         patch("shutil.rmtree") as mock_rmtree:
+
+        enrichment_df, ontology_dict_df = workflow.process_dataframes(
+            summary_df=summary_df,
+            clustered_df=clustered_df,
+            gene_list_path=str(gene_list),
+            background_genes_path=str(background_genes)
+        )
+
+        # The code should attempt to remove the temp dir
+        assert mock_rmtree.called, "Temporary directory should be cleaned up."
+        assert isinstance(enrichment_df, pd.DataFrame), "Should still return DataFrame objects."
+        assert isinstance(ontology_dict_df, pd.DataFrame), "Should still return DataFrame objects."
+
+
 # ---------------------------
 # Tests for run_full_workflow
 # ---------------------------
@@ -306,3 +459,18 @@ def test_run_full_workflow(
     assert "dictionary" in result
     assert result["enrichment"].equals(enrichment_df)
     assert result["dictionary"].equals(dictionary_df)
+
+
+def test_run_full_workflow_defaults(mock_ontology_workflow):
+    """
+    If no paths are provided to run_full_workflow, check that it uses 
+    default file paths based on the gene_set name and output_dir.
+    We'll just ensure it doesn't raise an error when defaults are used.
+    """
+    # Patch out the actual calls to avoid needing real files
+    with patch.object(mock_ontology_workflow, "run_ontology_enrichment", return_value=pd.DataFrame()), \
+         patch.object(mock_ontology_workflow, "create_ontology_dictionary", return_value=pd.DataFrame()):
+        try:
+            mock_ontology_workflow.run_full_workflow(gene_set="DefaultTest")
+        except Exception as e:
+            pytest.fail(f"run_full_workflow raised an exception with defaults: {e}")

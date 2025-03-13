@@ -263,7 +263,266 @@ def test_objective_functions():
         # Since we're mocking heavily, just make sure it returns a value
         assert isinstance(result, (int, float))
 
+def test_filter_terms_by_similarity_empty_csv():
+    """
+    Test filtering when the CSV is completely empty (no rows).
+    Ensures we handle reading and writing gracefully.
+    """
+    empty_df = pd.DataFrame(columns=["Term"])
+    
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as input_file, \
+         tempfile.NamedTemporaryFile(suffix=".csv") as output_file:
+        # Write an empty DataFrame to the input file
+        empty_df.to_csv(input_file.name, index=False)
+        
+        # No patching for the model is necessary if we skip embedding,
+        # but to avoid real model calls, let's just patch SentenceTransformer:
+        with patch("sentence_transformers.SentenceTransformer") as mock_model:
+            mock_model.return_value.encode.return_value = np.array([])
+            
+            # This should simply return an empty DataFrame
+            result = filter_terms_by_similarity(
+                input_csv=input_file.name,
+                output_csv=output_file.name,
+                target_rows=5
+            )
+            
+            # Verify the result is empty
+            assert result.empty, "Expected an empty result DataFrame."
+            # Verify output file was created
+            assert os.path.exists(output_file.name), "Output CSV should be created."
+    # Clean up the input file ourselves because delete=False
+    os.remove(input_file.name)
 
+
+def test_filter_terms_by_similarity_single_row_no_count():
+    """
+    Test filtering when the CSV contains exactly one row and no Count column.
+    """
+    single_row_df = pd.DataFrame({
+        "Term": ["apple"]
+    })
+    
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as input_file, \
+         tempfile.NamedTemporaryFile(suffix=".csv") as output_file:
+        single_row_df.to_csv(input_file.name, index=False)
+        
+        with patch("sentence_transformers.SentenceTransformer") as mock_model:
+            # Return a single embedding
+            mock_model.return_value.encode.return_value = np.array([[1.0, 0.0, 0.0]])
+            
+            # Test function
+            result = filter_terms_by_similarity(
+                input_csv=input_file.name,
+                output_csv=output_file.name,
+                target_rows=2  # More than total rows
+            )
+            
+            # Only one row -> no actual filtering is needed
+            assert len(result) == 1, "Should retain the single row."
+            # Check existence of the output file
+            assert os.path.exists(output_file.name)
+    os.remove(input_file.name)
+
+
+def test_filter_terms_by_similarity_single_row_with_count():
+    """
+    Test filtering when the CSV contains exactly one row (with a Count column).
+    """
+    single_row_df = pd.DataFrame({
+        "Term": ["apple"],
+        "Count": [10],
+    })
+    
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as input_file, \
+         tempfile.NamedTemporaryFile(suffix=".csv") as output_file:
+        single_row_df.to_csv(input_file.name, index=False)
+        
+        with patch("sentence_transformers.SentenceTransformer") as mock_model:
+            # Return a single embedding
+            mock_model.return_value.encode.return_value = np.array([[1.0, 0.0, 0.0]])
+            
+            # Patch find_best_params to return dummy thresholds
+            with patch("geneinsight.analysis.similarity.find_best_params") as mock_best_params:
+                mock_best_params.return_value = (0.5, 0.5)
+                
+                # Test function
+                result = filter_terms_by_similarity(
+                    input_csv=input_file.name,
+                    output_csv=output_file.name,
+                    target_rows=2
+                )
+                
+                assert len(result) == 1, "Should retain the single row with Count."
+                assert "Count" in result.columns
+    os.remove(input_file.name)
+
+
+def test_filter_terms_by_similarity_missing_term_column():
+    """
+    Test filtering when the CSV is missing the 'Term' column entirely.
+    This is expected to fail, but we want coverage of how we handle KeyError.
+    """
+    invalid_df = pd.DataFrame({
+        "BadColumn": ["foo", "bar"]
+    })
+    
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as input_file, \
+         tempfile.NamedTemporaryFile(suffix=".csv") as output_file:
+        invalid_df.to_csv(input_file.name, index=False)
+        
+        with pytest.raises(KeyError) as exc_info:
+            filter_terms_by_similarity(
+                input_csv=input_file.name,
+                output_csv=output_file.name,
+                target_rows=2
+            )
+        # This ensures we raise KeyError about the missing 'Term' column
+        assert "Term" in str(exc_info.value), "Expected KeyError mentioning 'Term'."
+    os.remove(input_file.name)
+
+
+def test_filter_terms_by_similarity_invalid_model():
+    """
+    Test handling of an invalid or non-existent SentenceTransformer model name.
+    This should raise an exception when SentenceTransformer tries to load it.
+    """
+    valid_df = pd.DataFrame({"Term": ["apple", "banana"]})
+    
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as input_file, \
+         tempfile.NamedTemporaryFile(suffix=".csv") as output_file:
+        valid_df.to_csv(input_file.name, index=False)
+        
+        # No patch here: we want to see the actual exception from the real model load
+        # Alternatively, you can expect a different exception type if the 
+        # environment has no internet or cannot load the model.
+        with pytest.raises(Exception) as exc_info:
+            filter_terms_by_similarity(
+                input_csv=input_file.name,
+                output_csv=output_file.name,
+                target_rows=2,
+                model_name="not-a-real-model-12345"
+            )
+        # We check that it complains about the model
+        assert "not-a-real-model-12345" in str(exc_info.value)
+    os.remove(input_file.name)
+
+
+def test_filter_terms_by_similarity_output_directory_creation():
+    """
+    Test that a nested output directory is created if it doesn't exist.
+    """
+    df = pd.DataFrame({"Term": ["apple", "banana"]})
+    
+    # Create a temporary directory, then append a subfolder
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output_dir = os.path.join(tmpdir, "deeply/nested/dir")
+        output_csv = os.path.join(output_dir, "output.csv")
+        
+        input_csv_path = os.path.join(tmpdir, "input.csv")
+        df.to_csv(input_csv_path, index=False)
+        
+        with patch("sentence_transformers.SentenceTransformer") as mock_model:
+            # Provide mock embeddings
+            mock_model.return_value.encode.return_value = np.array([[1.0, 0.0], [0.0, 1.0]])
+            
+            with patch("geneinsight.analysis.similarity.find_best_similarity_threshold") as mock_thresh:
+                mock_thresh.return_value = 0.5
+                result = filter_terms_by_similarity(
+                    input_csv=input_csv_path,
+                    output_csv=output_csv,
+                    target_rows=1,
+                )
+        # Verify the nested directory was created
+        assert os.path.isdir(output_dir), "Nested directory should be created."
+        assert os.path.exists(output_csv), "Output CSV should exist in the nested directory."
+        assert len(result) <= 2  # Some filtering might happen
+
+
+def test_filter_terms_with_non_numeric_count():
+    """
+    Test that a non-numeric 'Count' column doesn't break find_best_params.
+    We expect an exception or undesired result, but it will still expand coverage.
+    """
+    df_non_numeric = pd.DataFrame({
+        "Term": ["apple", "banana", "carrot"],
+        "Count": ["high", "medium", "low"]
+    })
+    
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as input_file, \
+         tempfile.NamedTemporaryFile(suffix=".csv") as output_file:
+        df_non_numeric.to_csv(input_file.name, index=False)
+        
+        with patch("sentence_transformers.SentenceTransformer") as mock_model:
+            # Provide mock embeddings
+            mock_model.return_value.encode.return_value = np.array([
+                [1.0, 0.0],
+                [0.0, 1.0],
+                [0.5, 0.5]
+            ])
+            
+            # We either expect a ValueError/TypeError when comparing strings with numeric.
+            # Wrap in a pytest.raises if you want to enforce an error, or run without it
+            # if you just want to see coverage. We'll demonstrate with an expected failure:
+            with pytest.raises(Exception) as exc_info:
+                filter_terms_by_similarity(
+                    input_csv=input_file.name,
+                    output_csv=output_file.name,
+                    target_rows=2,
+                )
+            # Expecting either ValueError or TypeError
+            assert isinstance(exc_info.value, (TypeError, ValueError))
+    os.remove(input_file.name)
+
+
+def test_find_best_similarity_threshold_small_target():
+    """
+    Test find_best_similarity_threshold with an extremely small target_rows (e.g. 0)
+    to check we cover that edge path in the objective function.
+    """
+    embeddings = np.array([
+        [1.0, 0.0], 
+        [0.9, 0.1], 
+        [0.0, 1.0]
+    ])
+    
+    # We do not want to run 100 trials in test, so let's patch the study.
+    with patch("optuna.create_study") as mock_study_func:
+        mock_study = MagicMock()
+        mock_study_func.return_value = mock_study
+        mock_study.best_params = {"threshold": 0.1}
+        
+        threshold = find_best_similarity_threshold(embeddings, target_rows=0)
+        assert threshold == 0.1
+        mock_study_func.assert_called_once()
+        mock_study.optimize.assert_called_once()
+
+
+def test_find_best_params_small_target():
+    """
+    Test find_best_params with an extremely small target_rows (e.g. 1).
+    """
+    df_counts = pd.DataFrame({
+        "Term": ["apple", "banana", "carrot", "date"],
+        "Count": [100, 80, 40, 10]
+    })
+    embeddings = np.array([
+        [1.0, 0.0], 
+        [0.9, 0.1], 
+        [0.2, 0.8],
+        [0.1, 0.9]
+    ])
+    
+    with patch("optuna.create_study") as mock_study_func:
+        mock_study = MagicMock()
+        mock_study_func.return_value = mock_study
+        mock_study.best_params = {"threshold": 0.75, "count_prop": 0.5}
+        
+        threshold, count_prop = find_best_params(embeddings, df_counts, target_rows=1)
+        assert threshold == 0.75
+        assert count_prop == 0.5
+        mock_study_func.assert_called_once()
+        mock_study.optimize.assert_called_once()
 
 
 if __name__ == "__main__":

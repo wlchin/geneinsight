@@ -76,25 +76,40 @@ class OntologyReader:
         self.gene_dict = self.read_ontology_file_to_dict(self.file_path)
 
     def read_ontology_file_to_dict(self, filepath):
-        """
-        Reads a tab-delimited ontology file where each line maps an ontology term to a list of genes.
-        Returns a dictionary mapping terms to gene lists.
-        """
         logger.debug(f"Reading ontology file: {filepath}")
         with open(filepath, 'r') as file:
             lines = file.readlines()
 
         data = []
         for line in lines:
-            parts = line.split('\t\t')
-            name = parts[0].strip()
-            genes = parts[1].strip().split('\t') if len(parts) > 1 else []
+            line = line.strip()
+            if not line:
+                # Skip empty lines
+                continue
+
+            # If there's a "\t\t", assume that is the correct format
+            if "\t\t" in line:
+                parts = line.split("\t\t", 1)
+                name = parts[0].strip()
+                genes_part = parts[1].strip() if len(parts) > 1 else ""
+                genes = genes_part.split("\t") if genes_part else []
+            else:
+                # Fallback: attempt to split on the first tab
+                fallback_parts = line.split("\t", 1)
+                name = fallback_parts[0].strip()
+                if len(fallback_parts) > 1:
+                    genes = fallback_parts[1].strip().split()
+                else:
+                    # No second part => no genes
+                    genes = []
+
             data.append([name, genes])
 
         df = pd.DataFrame(data, columns=['name', 'gene_list'])
         gene_dict = df.set_index('name')['gene_list'].to_dict()
         logger.debug(f"Read {len(gene_dict)} ontology terms from {os.path.basename(filepath)}.")
         return gene_dict
+
 
 
 class RAGModuleGSEAPY:

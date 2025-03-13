@@ -8,8 +8,11 @@ from joblib import Parallel, delayed
 from typing import Optional, Dict, Any
 from pathlib import Path
 from pydantic import BaseModel, Field
+logging.getLogger("httpx").disabled = True
 
 logger = logging.getLogger(__name__)
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Check for a local .env file and load it if available
 env_path = Path('.env')
@@ -17,11 +20,11 @@ if env_path.exists():
     try:
         from dotenv import load_dotenv
         load_dotenv(dotenv_path=env_path)
-        logger.info("Loaded environment variables from .env file.")
+        #logger.info("Loaded environment variables from .env file.")
     except ImportError:
         logger.warning("python-dotenv not installed; cannot load .env file.")
 else:
-    logger.info("No .env file found; relying on system environment variables.")
+    logger.warning("No .env file found; relying on system environment variables.")
 
 # Import instructor + OpenAI if available
 try:

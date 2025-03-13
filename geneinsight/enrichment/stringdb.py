@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Module for querying the StringDB API for gene enrichment.
+Module for querying the StringDB API for gene enrichment, with a user-specifiable species.
 """
 
 import argparse
@@ -21,6 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 def read_gene_list(input_file: str) -> List[str]:
     """
     Read a gene list from a file. Returns an empty list if the file has no data.
@@ -34,7 +35,11 @@ def read_gene_list(input_file: str) -> List[str]:
         # No columns to parse if file is empty
         return []
 
-def get_string_output(list_of_genes: List[str]) -> Tuple[pd.DataFrame, List[str]]:
+
+def get_string_output(
+    list_of_genes: List[str], 
+    species: int = 9606
+) -> Tuple[pd.DataFrame, List[str]]:
     """
     Mode 1: Retrieves the enrichment data from StringDB for a given list of genes.
     """
@@ -42,14 +47,20 @@ def get_string_output(list_of_genes: List[str]) -> Tuple[pd.DataFrame, List[str]
     if not list_of_genes:
         return pd.DataFrame(columns=["description"]), []
 
-    string_ids = stringdb.get_string_ids(list_of_genes)
-    enrichment_df = stringdb.get_enrichment(string_ids.queryItem)
+    # Pass the species parameter into get_string_ids and get_enrichment
+    string_ids = stringdb.get_string_ids(list_of_genes, species=species)
+    enrichment_df = stringdb.get_enrichment(
+        string_ids.queryItem,
+        species=species
+    )
     documents = enrichment_df["description"].unique().tolist()
     return enrichment_df, documents
 
+
 def query_string_db_individual_genes(
     genes: List[str], 
-    log_file: str
+    log_file: str,
+    species: int = 9606
 ) -> Tuple[pd.DataFrame, List[str]]:
     """
     Mode 2: Queries the StringDB database for enrichment information for individual genes.
@@ -66,12 +77,16 @@ def query_string_db_individual_genes(
 
     for gene in tqdm(genes, desc="Processing genes"):
         try:
-            string_ids = stringdb.get_string_ids([gene])
-            enrichment_df = stringdb.get_enrichment(string_ids.queryItem)
+            # Pass the species parameter here as well
+            string_ids = stringdb.get_string_ids([gene], species=species)
+            enrichment_df = stringdb.get_enrichment(
+                string_ids.queryItem,
+                species=species
+            )
             # We add 'gene_queried' to the columns below
             enrichment_df["gene_queried"] = gene
             list_of_df.append(enrichment_df)
-            time.sleep(.2)  # Rate limiting
+            time.sleep(1)  # Rate limiting
         except KeyboardInterrupt:
             logger.info("Pipeline terminated by user via KeyboardInterrupt.")
             sys.exit(1)
@@ -102,10 +117,12 @@ def query_string_db_individual_genes(
     documents = total_df["description"].unique().tolist()
     return total_df, documents
 
+
 def process_gene_enrichment(
     input_file: str,
     output_dir: str,
-    mode: str = "single"
+    mode: str = "single",
+    species: int = 9606
 ) -> Tuple[pd.DataFrame, List[str]]:
     """
     Process gene enrichment from StringDB based on the specified mode.
@@ -114,6 +131,7 @@ def process_gene_enrichment(
         input_file: Path to input file containing gene list
         output_dir: Directory to store output CSV files
         mode: Query mode ('list' or 'single')
+        species: NCBI species ID (default is 9606 for human)
         
     Returns:
         Tuple containing:
@@ -125,10 +143,10 @@ def process_gene_enrichment(
     input_basename = os.path.splitext(os.path.basename(input_file))[0]
 
     if mode == "list":
-        enrichment_df, documents = get_string_output(genes)
+        enrichment_df, documents = get_string_output(genes, species=species)
     else:
         log_file = os.path.join(output_dir, f"{input_basename}__bad_requests.log")
-        enrichment_df, documents = query_string_db_individual_genes(genes, log_file)
+        enrichment_df, documents = query_string_db_individual_genes(genes, log_file, species=species)
 
     enrichment_output_path = os.path.join(output_dir, f"{input_basename}__enrichment.csv")
     documents_output_path = os.path.join(output_dir, f"{input_basename}__documents.csv")
@@ -141,18 +159,28 @@ def process_gene_enrichment(
     
     return enrichment_df, documents
 
+
 def main():
     parser = argparse.ArgumentParser(description="Query gene enrichment from StringDB.")
-    parser.add_argument("-i", "--input", required=True, help="Path to input CSV file containing gene list.")
+    parser.add_argument("-i", "--input", required=True,
+                        help="Path to input CSV file containing gene list.")
     parser.add_argument("-m", "--mode", choices=["list", "single"], default="single",
-                        help="Query mode: 'list' for batch enrichment from a gene list, 'single' for enrichment on individual genes. Default: single")
-    parser.add_argument("-o", "--output_dir", required=True, help="Directory to store output CSV files.")
+                        help="Query mode: 'list' for batch enrichment from a gene list, "
+                             "'single' for enrichment on individual genes. Default: single")
+    parser.add_argument("-o", "--output_dir", required=True,
+                        help="Directory to store output CSV files.")
+    # New species argument
+    parser.add_argument("-s", "--species", type=int, default=9606,
+                        help="NCBI species ID to use in the query (default: 9606, human).")
+
     args = parser.parse_args()
     process_gene_enrichment(
         input_file=args.input,
         output_dir=args.output_dir,
-        mode=args.mode
+        mode=args.mode,
+        species=args.species
     )
+
 
 if __name__ == "__main__":
     main()

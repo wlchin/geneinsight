@@ -79,7 +79,7 @@ def hypergeometric_enrichment(
     gene_origin_path: str,
     background_genes_path: str,
     output_csv: str,
-    pvalue_threshold: float = 0.01
+    pvalue_threshold: float = 0.05
 ) -> pd.DataFrame:
     """
     Perform hypergeometric enrichment analysis on a summary DataFrame.

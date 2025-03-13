@@ -2,7 +2,7 @@ import os
 import time
 import logging
 import tempfile
-import shutil  # Added for directory operations
+import shutil
 from pathlib import Path
 import pandas as pd
 from typing import List, Dict, Any, Optional, Union
@@ -31,22 +31,8 @@ class Pipeline:
         api_parallel_jobs: int = 4,
         api_base_url: Optional[str] = None,
         target_filtered_topics: int = 25,
+        species: int = 9606
     ):
-        """
-        Initialize the pipeline.
-        
-        Args:
-            output_dir: Directory to store final outputs
-            temp_dir: Directory for temporary files (if None, uses system temp dir)
-            n_samples: Number of topic models to run with different seeds
-            num_topics: Number of topics to extract in topic modeling
-            pvalue_threshold: Adjusted P-value threshold for filtering results
-            api_service: API service for topic refinement ("openai", "together", etc.)
-            api_model: Model name for the API service
-            api_parallel_jobs: Number of parallel API jobs
-            api_base_url: Base URL for the API service (if needed)
-            target_filtered_topics: Target number of topics after filtering
-        """
         self.output_dir = os.path.abspath(output_dir)
         
         # Use system temp directory if none specified
@@ -65,6 +51,7 @@ class Pipeline:
         self.api_parallel_jobs = api_parallel_jobs
         self.api_base_url = api_base_url
         self.target_filtered_topics = target_filtered_topics
+        self.species = species  # Save species as an instance variable
         
         # Create directories
         os.makedirs(self.output_dir, exist_ok=True)
@@ -88,7 +75,7 @@ class Pipeline:
         for dir_path in self.dirs.values():
             os.makedirs(dir_path, exist_ok=True)
         
-        # NEW: Create sphinx_builds directory as a subfolder in the results folder.
+        # Create sphinx_builds directory as a subfolder in the results folder.
         self.dirs["sphinx_builds"] = os.path.join(self.dirs["final"], "sphinx_builds")
         os.makedirs(self.dirs["sphinx_builds"], exist_ok=True)
         
@@ -123,6 +110,22 @@ class Pipeline:
         gene_set_name = os.path.splitext(os.path.basename(query_gene_set))[0]
         run_id = f"{gene_set_name}_{self.timestamp}"
         logger.info(f"Run ID: {run_id}")
+
+        # ---------------------------------------------------------------------
+        # NEW CHECK #1: Ensure there is overlap between query gene set and background.
+        # ---------------------------------------------------------------------
+        try:
+            query_genes = set(pd.read_csv(query_gene_set, header=None)[0].unique())
+            background_genes = set(pd.read_csv(background_gene_list, header=None)[0].unique())
+        except Exception as e:
+            logger.error(f"Failed to read gene files: {e}")
+            raise
+        
+        overlap = query_genes.intersection(background_genes)
+        if not overlap:
+            logger.error("No common items between the query gene set and the background gene list. Aborting pipeline.")
+            # You can raise an exception or simply return.
+            raise ValueError("No overlap found between query gene set and background. Pipeline aborted.")
         
         try:
             # 1. Get gene enrichment data from StringDB
@@ -150,7 +153,14 @@ class Pipeline:
             enriched_df = self._perform_hypergeometric_enrichment(
                 summary_df, query_gene_set, background_gene_list
             )
-            
+
+            # ---------------------------------------------------------------------
+            # NEW CHECK #2: Ensure enriched_df is not empty.
+            # ---------------------------------------------------------------------
+            if enriched_df.empty:
+                logger.error("No results from hypergeometric enrichment. Aborting pipeline.")
+                raise ValueError("Hypergeometric enrichment resulted in an empty DataFrame. Pipeline aborted.")
+
             # 7. Run topic modeling on the filtered gene sets (meta-analysis)
             logger.info("Step 7: Running topic modeling on filtered gene sets")
             topics_df = self._run_topic_modeling_on_filtered_sets(enriched_df)
@@ -182,7 +192,7 @@ class Pipeline:
                 background_gene_list=background_gene_list
             )
             
-            # Add ontology_dict_df to the finalize_outputs call
+            # 10. Finalize outputs
             logger.info("Step 10: Finalizing outputs")
             output_path = self._finalize_outputs(
                 run_id,
@@ -226,7 +236,11 @@ class Pipeline:
             # Only clean up if we used a system temp directory
             if self._temp_is_system:
                 self._cleanup_temp()
-    
+
+    # --------------------------------------------------------------
+    # The rest of your methods remain unchanged...
+    # --------------------------------------------------------------
+
     def _cleanup_temp(self):
         """Clean up temporary directory if it's a system-generated one."""
         if hasattr(self, '_temp_is_system') and self._temp_is_system and os.path.exists(self.temp_dir):
@@ -238,47 +252,27 @@ class Pipeline:
                 logger.warning(f"Error cleaning up temporary directory: {e}")
     
     def _reorganize_output_directory(self, output_path: str):
-        """
-        Reorganize the output directory structure at the results level:
-        1. Remove the ontology folder
-        2. Move sphinx_builds to top level
-        3. Remove the original sphinx_builds directory
-        4. Zip both remaining folders in the results directory
-        
-        Args:
-            output_path: Path to the run output directory
-        """
+        """Reorganize the output directory structure at the results level."""
         try:
-            # Get the results directory (one level above output_path)
             results_dir = self.dirs["final"]
             logger.info(f"Reorganizing output directory structure in: {results_dir}")
             
-            # 1. Remove the ontology folder
             ontology_path = os.path.join(results_dir, "ontology")
             if os.path.exists(ontology_path):
                 logger.info(f"Removing ontology folder: {ontology_path}")
                 shutil.rmtree(ontology_path)
             
-            # 2. Check if sphinx_builds exists and contains content to move
             sphinx_source_path = os.path.join(results_dir, "sphinx_builds")
             if os.path.exists(sphinx_source_path):
-                # The nested build directory we want to extract
                 sphinx_nested_builds = os.path.join(sphinx_source_path, "results", "sphinx_builds")
-                
-                # Check if the nested sphinx_builds directory exists
                 if os.path.exists(sphinx_nested_builds):
-                    # Create a temporary directory at the top level to avoid conflicts
                     sphinx_temp_path = os.path.join(results_dir, "sphinx_builds_temp")
-                    
-                    # Copy nested sphinx_builds contents to temporary directory
                     logger.info(f"Copying sphinx builds to top level: {sphinx_nested_builds} -> {sphinx_temp_path}")
                     shutil.copytree(sphinx_nested_builds, sphinx_temp_path)
                     
-                    # Remove the original sphinx_builds directory
                     logger.info(f"Removing original sphinx_builds folder: {sphinx_source_path}")
                     shutil.rmtree(sphinx_source_path)
                     
-                    # Rename the temporary directory to sphinx_builds
                     logger.info(f"Renaming temporary sphinx_builds folder to final location")
                     os.rename(sphinx_temp_path, sphinx_source_path)
                 else:
@@ -286,39 +280,30 @@ class Pipeline:
             else:
                 logger.warning(f"Sphinx builds directory not found: {sphinx_source_path}")
             
-            # 4. Zip both remaining folders in the results directory
             self._zip_results_folders(results_dir)
-                
             logger.info("Output directory reorganization completed")
             
         except Exception as e:
             logger.error(f"Error reorganizing output directory: {e}", exc_info=True)
-            # Continue with pipeline execution even if reorganization fails
-            
+    
     def _zip_results_folders(self, results_dir: str):
-        """
-        Zip each folder within the results directory.
-        
-        Args:
-            results_dir: Path to the results directory
-        """
+        """Zip each folder within the results directory."""
         from .utils.zip_helper import zip_directory
         
         try:
             logger.info("Zipping folders in results directory")
             
-            # Get a list of all directories in the results directory (excluding files)
-            dirs_to_zip = [d for d in os.listdir(results_dir) 
-                          if os.path.isdir(os.path.join(results_dir, d))]
+            dirs_to_zip = [
+                d for d in os.listdir(results_dir) 
+                if os.path.isdir(os.path.join(results_dir, d))
+            ]
             
             for dir_name in dirs_to_zip:
                 dir_path = os.path.join(results_dir, dir_name)
                 zip_path = os.path.join(results_dir, f"{dir_name}.zip")
-                
                 logger.info(f"Zipping directory: {dir_path} -> {zip_path}")
                 zip_directory(dir_path, zip_path)
                 
-                # Remove the original directory after zipping
                 logger.info(f"Removing original directory: {dir_path}")
                 shutil.rmtree(dir_path)
                 
@@ -326,7 +311,6 @@ class Pipeline:
             
         except Exception as e:
             logger.error(f"Error zipping results folders: {e}", exc_info=True)
-            # Continue with pipeline execution even if zipping fails
     
     def _get_stringdb_enrichment(self, query_gene_set: str) -> tuple:
         """Get gene enrichment data from StringDB."""
@@ -338,6 +322,7 @@ class Pipeline:
         enrichment_df, documents = process_gene_enrichment(
             input_file=query_gene_set,
             output_dir=self.dirs["enrichment"],
+            species=self.species,  # Use the species from the instance variable
             mode="single"
         )
         
@@ -393,7 +378,6 @@ class Pipeline:
         prompts_path = os.path.join(self.dirs["prompts"], "prompts.csv")
         api_output = os.path.join(self.dirs["minor_topics"], "api_results.csv")
         
-        # Save prompts to CSV if not already saved.
         if not os.path.exists(prompts_path):
             prompts_df.to_csv(prompts_path, index=False)
         
@@ -416,7 +400,6 @@ class Pipeline:
         enrichment_path = os.path.join(self.dirs["enrichment"], "enrichment.csv")
         summary_output = os.path.join(self.dirs["summary"], "summary.csv")
         
-        # Save to CSV first (if not already saved)
         if not os.path.exists(api_path):
             api_results_df.to_csv(api_path, index=False)
         if not os.path.exists(enrichment_path):
@@ -437,7 +420,6 @@ class Pipeline:
         summary_path = os.path.join(self.dirs["summary"], "summary.csv")
         enriched_output = os.path.join(self.dirs["filtered_sets"], "enriched.csv")
         
-        # Save summary to CSV if not already saved
         if not os.path.exists(summary_path):
             summary_df.to_csv(summary_path, index=False)
         
@@ -494,7 +476,6 @@ class Pipeline:
         """Filter topics by similarity."""
         from .analysis.similarity import filter_terms_by_similarity
         
-        # Always write the provided input DataFrame to file
         key_topics_file = os.path.join(self.dirs["key_topics"], "key_topics.csv")
         input_df.to_csv(key_topics_file, index=False)
         
@@ -510,17 +491,14 @@ class Pipeline:
         return filtered_df
     
     def _run_clustering(self, filtered_df: pd.DataFrame) -> pd.DataFrame:
-        """Run clustering on the filtered topics using the geneinsight.analysis.clustering module."""
-        from .analysis.clustering import run_clustering  # Assuming this function is available in the module
+        """Run clustering on the filtered topics."""
+        from .analysis.clustering import run_clustering
         
-        # Save filtered topics to a CSV file that will be used as input for clustering
         clustering_input = os.path.join(self.dirs["filtered_sets"], "filtered.csv")
         filtered_df.to_csv(clustering_input, index=False)
         
-        # Define the output path for the clustering results
         clustering_output = os.path.join(self.dirs["filtered_sets"], "clustered.csv")
         
-        # Run the clustering function with desired parameters
         run_clustering(
             input_csv=clustering_input,
             output_csv=clustering_output,
@@ -529,7 +507,6 @@ class Pipeline:
             n_trials=100
         )
         
-        # Load the clustered data and return it
         clustered_df = pd.read_csv(clustering_output)
         return clustered_df
     
@@ -541,25 +518,12 @@ class Pipeline:
     ) -> Optional[str]:
         """
         Generate an HTML report using geneinsight.reports.pipeline.run_pipeline.
-
-        Args:
-            output_path: Path to the pipeline output directory
-            query_gene_set: Path to the query gene set file (used to derive the gene set name)
-            report_title: Title for the report
-
-        Returns:
-            Path to the generated Sphinx HTML index, or None if generation failed.
         """
         logger.info("Generating HTML report using geneinsight.reports.pipeline.run_pipeline...")
-
-        # Derive gene set name from the query_gene_set file name.
         gene_set = os.path.splitext(os.path.basename(query_gene_set))[0]
-
-        # Use the sphinx_builds directory inside results as the report output folder.
         report_out_dir = self.dirs["sphinx_builds"]
         os.makedirs(report_out_dir, exist_ok=True)
 
-        # Input folder is the output_path
         input_folder = output_path
 
         try:
@@ -583,13 +547,6 @@ class Pipeline:
     ) -> str:
         """
         Finalize outputs by copying to the output directory.
-        
-        Args:
-            run_id: Unique identifier for this run
-            dataframes: Dictionary of dataframes to save
-            
-        Returns:
-            Path to the output directory
         """
         run_dir = os.path.join(self.dirs["final"], run_id)
         os.makedirs(run_dir, exist_ok=True)
@@ -607,6 +564,7 @@ class Pipeline:
             "pvalue_threshold": self.pvalue_threshold,
             "api_service": self.api_service,
             "api_model": self.api_model,
+            "species": self.species, 
         }
         
         metadata_path = os.path.join(run_dir, "metadata.csv")
@@ -623,31 +581,19 @@ class Pipeline:
     ) -> pd.DataFrame:
         """
         Perform ontology enrichment analysis using the ontology workflow.
-        
-        Args:
-            summary_df: DataFrame containing gene summary information
-            clustered_df: DataFrame containing clustered topics
-            query_gene_set: Path to the query gene set file
-            background_gene_list: Path to the background genes file
-            
-        Returns:
-            DataFrame containing the ontology dictionary
         """
         logger.info("Running ontology enrichment analysis")
         
-        # Initialize the ontology workflow
         ontology_folder = os.path.join(os.path.dirname(__file__), "ontology", "ontology_folders")
         workflow = OntologyWorkflow(
             ontology_folder=ontology_folder,
             fdr_threshold=self.pvalue_threshold,
-            use_temp_files=False  # Process dataframes in memory
+            use_temp_files=False
         )
         
-        # Create output directory for ontology results
         ontology_output_dir = os.path.join(self.dirs["final"], "ontology")
         os.makedirs(ontology_output_dir, exist_ok=True)
         
-        # Process dataframes directly
         enrichment_df, ontology_dict_df = workflow.process_dataframes(
             summary_df=summary_df,
             clustered_df=clustered_df,
@@ -660,11 +606,12 @@ class Pipeline:
         
         return ontology_dict_df
 
-
-
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Run the TopicGenes pipeline.")
+    parser.add_argument(
+        "--species", type=int, default=9606, help="Species identifier (default: 9606 for human)."
+    )
     parser.add_argument(
         "query_gene_set", help="Path to file containing query gene set."
     )
@@ -707,9 +654,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--report_title", type=str, default=None, help="Title for the generated report."
     )
-    
     args = parser.parse_args()
-    
+
     pipeline = Pipeline(
         output_dir=args.output_dir,
         temp_dir=args.temp_dir,
@@ -721,10 +667,11 @@ if __name__ == "__main__":
         api_parallel_jobs=args.api_parallel_jobs,
         api_base_url=args.api_base_url,
         target_filtered_topics=args.target_filtered_topics,
+        species=args.species
     )
     
     pipeline.run(
-        query_gene_set=args.query_gene_set, 
+        query_gene_set=args.query_gene_set,
         background_gene_list=args.background_gene_list,
         generate_report=not args.no_report,
         report_title=args.report_title

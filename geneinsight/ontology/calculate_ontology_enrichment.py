@@ -137,7 +137,7 @@ class RAGModuleGSEAPY:
             res_df = pd.DataFrame()
         return res_df
 
-    def get_enrichment(self, fdr_threshold=0.1):
+    def get_enrichment(self, fdr_threshold=0.05):
         """
         Run GSEA on all provided ontologies and filter the results by the given FDR threshold.
 
@@ -176,7 +176,7 @@ class RAGModuleGSEAPY:
 
         return self.enrichr_results
 
-    def get_top_documents(self, query, gene_list, background_list=None, N=5, fdr_threshold=0.1):
+    def get_top_documents(self, query, gene_list, background_list=None, N=5, fdr_threshold=0.05):
         """
         The main function that orchestrates the GSEA and document retrieval.
         Retrieve the top N documents (terms) related to the query based on cosine similarity.

@@ -12,6 +12,9 @@ from typing import List, Tuple, Optional
 from sentence_transformers import SentenceTransformer
 from scipy.spatial.distance import cosine
 import optuna
+from optuna.samplers import TPESampler
+
+sampler = TPESampler(seed=10)
 
 # Configure logging
 logging.basicConfig(
@@ -67,7 +70,7 @@ def find_best_similarity_threshold(embeddings, target_rows: int) -> float:
         return abs(filtered_count - target_rows)
 
     # Create and run Optuna study
-    study = optuna.create_study(direction="minimize")
+    study = optuna.create_study(direction="minimize", sampler=sampler)
     study.optimize(objective, n_trials=100)
     
     # Get best parameter
@@ -113,7 +116,7 @@ def find_best_params(embeddings, df: pd.DataFrame, target_rows: int) -> Tuple[fl
         return abs(len(temp_df) - target_rows)
 
     # Create and run Optuna study
-    study = optuna.create_study(direction="minimize")
+    study = optuna.create_study(direction="minimize", sampler=sampler)
     study.optimize(objective, n_trials=100)
     
     # Get best parameters

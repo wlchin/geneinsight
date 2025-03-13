@@ -232,8 +232,8 @@ class RAGModuleGSEAPY:
         # Compute embeddings
         documents = self.enrichr_results["Term"].tolist()
         logger.debug(f"Computing embeddings for {len(documents)} documents.")
-        document_embeddings = self.embedder.encode(documents, convert_to_tensor=True)
-        query_embedding = self.embedder.encode(query, convert_to_tensor=True)
+        document_embeddings = self.embedder.encode(documents, convert_to_tensor=True, show_progress_bar=False)
+        query_embedding = self.embedder.encode(query, convert_to_tensor=True, show_progress_bar=False)
 
         # Cosine similarity
         cosine_scores = util.pytorch_cos_sim(query_embedding, document_embeddings)[0]
@@ -276,42 +276,42 @@ class RAGModuleGSEAPY:
         return top_results_indices, extracted_items, self.enrichr_results, enrichr_df_filtered, extracted_items
 
     def format_top_documents(self, top_results_indices):
-            """
-            Format the top documents into a readable list with their FDR and sets.
-            Disallow negative indices to treat them as out-of-bounds.
-            """
-            # If we have no data or an empty index list, return early
-            if (
-                self.enrichr_results is None
-                or self.enrichr_results.empty
-                or not top_results_indices
-            ):
-                return "", pd.DataFrame()
+        """
+        Format the top documents into a readable list with their FDR and sets.
+        Disallow negative indices to treat them as out-of-bounds.
+        """
+        # If we have no data or an empty index list, return early
+        if (
+            self.enrichr_results is None
+            or self.enrichr_results.empty
+            or not top_results_indices
+        ):
+            return "", pd.DataFrame()
 
-            # Explicitly disallow negative indices
-            if any(idx < 0 for idx in top_results_indices):
-                logger.warning(
-                    "IndexError: Negative indices are disallowed. Returning empty results."
-                )
-                return "", pd.DataFrame()
+        # Explicitly disallow negative indices
+        if any(idx < 0 for idx in top_results_indices):
+            logger.warning(
+                "IndexError: Negative indices are disallowed. Returning empty results."
+            )
+            return "", pd.DataFrame()
 
-            # Try to index the results
-            try:
-                df_filtered = self.enrichr_results.iloc[top_results_indices]
-            except IndexError:
-                logger.warning(
-                    "IndexError: Attempted to index out-of-bounds in enrichr_results. Returning empty results."
-                )
-                return "", pd.DataFrame()
+        # Try to index the results
+        try:
+            df_filtered = self.enrichr_results.iloc[top_results_indices]
+        except IndexError:
+            logger.warning(
+                "IndexError: Attempted to index out-of-bounds in enrichr_results. Returning empty results."
+            )
+            return "", pd.DataFrame()
 
-            logger.debug(f"Formatting top {len(top_results_indices)} documents.")
-            output = []
-            for _, row in df_filtered.iterrows():
-                output.append(
-                    f"* `{row['Gene_set']}: {row['Term']} - FDR: {row['Adjusted P-value']:.4f}`"
-                )
-            formatted_output = "\n".join(output)
-            return formatted_output, df_filtered
+        logger.debug(f"Formatting top {len(top_results_indices)} documents.")
+        output = []
+        for _, row in df_filtered.iterrows():
+            output.append(
+                f"* `{row['Gene_set']}: {row['Term']} - FDR: {row['Adjusted P-value']:.4f}`"
+            )
+        formatted_output = "\n".join(output)
+        return formatted_output, df_filtered
 
 
 def main():

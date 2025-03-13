@@ -18,6 +18,9 @@ from openai import OpenAI
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 dotenv.load_dotenv()
 
 # ------------------------------
@@ -137,7 +140,7 @@ def parallel_subheading_text(contexts, service, api_key, model, base_url, n_jobs
     Returns a dictionary mapping each context -> subheading text.
     """
     def _worker(ctx):
-        logging.info(f"Calling API for context: {ctx}")
+        #logging.info(f"Calling API for context: {ctx}")
         return ctx, produce_subheading_text(ctx, service, api_key, model, base_url)
     
     results = Parallel(n_jobs=n_jobs)(
@@ -153,7 +156,7 @@ def parallel_main_heading(cluster_data, service, api_key, model, base_url, n_job
     """
     def _worker(cid, transcript):
         heading = produce_main_heading(transcript, service, api_key, model, base_url)
-        logging.info(f"Cluster {cid} heading: {heading}")
+        #logging.info(f"Cluster {cid} heading: {heading}")
         return {"cluster": cid, "transcript": transcript, "heading": heading}
     
     results = Parallel(n_jobs=n_jobs)(
@@ -174,7 +177,7 @@ def parallel_main_heading_text(headings_df, subheading_df, service, api_key, mod
             for _, subrow in cluster_subs.iterrows()
         ]
         combined_text = "\n".join(combined_list)
-        logging.info(f"Calling API for main heading text for cluster {cluster_id}")
+        #logging.info(f"Calling API for main heading text for cluster {cluster_id}")
         return produce_main_heading_text(combined_text, service, api_key, model, base_url)
     
     results = Parallel(n_jobs=n_jobs)(

@@ -67,7 +67,8 @@ def copy_input_files(input_folder, output_folder, gene_set):
         "api_results.csv": f"results/minor_topics/{gene_set}_minor_topics.csv",
         "topics.csv": f"results/topics_for_genelists/{gene_set}_topic_model.csv",
         "enrichment.csv": f"results/enrichment_df/{gene_set}__enrichment.csv",
-        "ontology_dict.csv": f"results/ontology_dict/{gene_set}_ontology_dict.csv"
+        "ontology_dict.csv": f"results/ontology_dict/{gene_set}_ontology_dict.csv",
+        "enriched.csv": f"results/filtered_sets/{gene_set}_filtered_gene_sets.csv"
     }
     
     missing_files = []

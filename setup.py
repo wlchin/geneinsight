@@ -9,8 +9,8 @@ from setuptools import setup, find_packages
 NAME = 'geneinsight'
 DESCRIPTION = 'Topic modeling pipeline for gene sets with enrichment analysis'
 URL = 'https://github.com/wlchin/geneinsight'
-EMAIL = 'your.email@example.com'
-AUTHOR = 'Your Name'
+EMAIL = 'wee.chin@health.wa.gov.au'
+AUTHOR = 'WL Chin'
 REQUIRES_PYTHON = '>=3.9'
 VERSION = '0.1.0'
 

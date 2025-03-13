@@ -130,7 +130,7 @@ def create_clustered_sections(
                 'code_block': row.get('unique_genes', ''),
                 'toggle': toggle_content
             }
-            print(subsection)
+            #print(subsection)
             cluster_subsections[cluster].append(subsection)
 
     # Combine headings and subsections into a sections list per cluster
@@ -186,7 +186,7 @@ def generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api):
                 code_items = sorted(code_dict.items(), key=lambda x: x[1], reverse=True)
                 top_5 = code_items[:5]
                 top_5_keys = []
-                for k, _ in tqdm(top_5, desc="Fetching gene summaries"):
+                for k, _ in top_5:
                     logging.info(f"Fetching summary for gene: {k}")
                     if call_ncbi_api:
                         gene_id, summary_text = get_gene_summary(k)

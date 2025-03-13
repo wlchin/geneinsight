@@ -29,7 +29,7 @@ def setup_logging(log_folder):
     log_file = os.path.join(log_folder, f"pipeline_{timestamp}.log")
     
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.WARNING,
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[
             logging.FileHandler(log_file),

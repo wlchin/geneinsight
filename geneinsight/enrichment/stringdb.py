@@ -23,15 +23,25 @@ logger = logging.getLogger(__name__)
 
 def read_gene_list(input_file: str) -> List[str]:
     """
-    Read a gene list from a file.
+    Read a gene list from a file. Returns an empty list if the file has no data.
     """
-    genes = pd.read_csv(input_file, header=None).iloc[:, 0].tolist()
-    return genes
+    try:
+        df = pd.read_csv(input_file, header=None)
+        if df.empty:
+            return []
+        return df.iloc[:, 0].tolist()
+    except pd.errors.EmptyDataError:
+        # No columns to parse if file is empty
+        return []
 
 def get_string_output(list_of_genes: List[str]) -> Tuple[pd.DataFrame, List[str]]:
     """
     Mode 1: Retrieves the enrichment data from StringDB for a given list of genes.
     """
+    # >>> Minimal fix: If empty, return a DataFrame with columns
+    if not list_of_genes:
+        return pd.DataFrame(columns=["description"]), []
+
     string_ids = stringdb.get_string_ids(list_of_genes)
     enrichment_df = stringdb.get_enrichment(string_ids.queryItem)
     documents = enrichment_df["description"].unique().tolist()
@@ -44,6 +54,10 @@ def query_string_db_individual_genes(
     """
     Mode 2: Queries the StringDB database for enrichment information for individual genes.
     """
+    # >>> Minimal fix: If empty, return a DataFrame with columns
+    if not genes:
+        return pd.DataFrame(columns=["description", "gene_queried"]), []
+
     list_of_df = []
     logger.info("Querying StringDB for enrichment information.")
     num_genes = len(genes)
@@ -54,6 +68,7 @@ def query_string_db_individual_genes(
         try:
             string_ids = stringdb.get_string_ids([gene])
             enrichment_df = stringdb.get_enrichment(string_ids.queryItem)
+            # We add 'gene_queried' to the columns below
             enrichment_df["gene_queried"] = gene
             list_of_df.append(enrichment_df)
             time.sleep(.2)  # Rate limiting
@@ -79,8 +94,9 @@ def query_string_db_individual_genes(
                 f.write(f"{gene}\n")
         logger.info(f"Bad requests logged to {log_file}")
 
-    if len(list_of_df) == 0:
-        return pd.DataFrame(), []
+    # >>> Minimal fix: If no successes, return a DataFrame with columns
+    if not list_of_df:
+        return pd.DataFrame(columns=["description", "gene_queried"]), []
 
     total_df = pd.concat(list_of_df, ignore_index=True)
     documents = total_df["description"].unique().tolist()

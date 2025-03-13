@@ -53,8 +53,8 @@ def main():
         help="Model name for the API service (default 'gpt-4o-mini')."
     )
     parser.add_argument(
-        "--api_parallel_jobs", type=int, default=50,
-        help="Number of parallel API jobs (default 50)."
+        "--api_parallel_jobs", type=int, default=1,
+        help="Number of parallel API jobs (default 1)."
     )
     parser.add_argument(
         "--api_base_url", type=str, default=None,
@@ -91,7 +91,7 @@ def main():
         api_parallel_jobs=args.api_parallel_jobs,
         api_base_url=args.api_base_url,
         target_filtered_topics=args.target_filtered_topics,
-        species=args.species  # Pass species parameter to Pipeline
+        species=args.species
     )
 
     logger.info("Running GeneInsight pipeline from CLI...")

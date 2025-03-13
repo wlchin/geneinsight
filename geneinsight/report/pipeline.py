@@ -56,10 +56,31 @@ def run_command(cmd, description, cwd=None):
         logging.error(f"Command output: {e.output}")
         return False, e.output
 
-def run_pipeline(input_folder, output_folder, gene_set):
-    """Run the complete GeneInsight pipeline."""
+def run_pipeline(
+    input_folder, 
+    output_folder, 
+    gene_set,
+    # New parameters to support multiple API services for context generation:
+    context_service="openai", 
+    context_api_key=None, 
+    context_model="gpt-4o-mini", 
+    context_base_url=None
+):
+    """
+    Run the complete GeneInsight pipeline.
+    
+    Args:
+        input_folder (str): Folder with the input files.
+        output_folder (str): Folder where outputs will be saved.
+        gene_set (str): Identifier for the gene set.
+        context_service (str): Service to use for context generation ("openai" or "ollama").
+        context_api_key (str): API key for the chosen service.
+        context_model (str): Model to use for generation.
+        context_base_url (str): Base URL for the API (if needed, e.g. for ollama).
+    """
     start_time = time.time()
     logging.info(f"Starting GeneInsight pipeline for gene set: {gene_set}")
+    logging.info(f"Using context generation service: {context_service}")
     
     # Define file paths
     paths = {
@@ -90,12 +111,16 @@ def run_pipeline(input_folder, output_folder, gene_set):
         copy_input_files(input_folder, output_folder, gene_set)
         logo_path = copy_logo(output_folder)
         
-        # Step 1: Generate context 
+        # Step 1: Generate context with additional API service parameters
         generate_context(
             summary_path=paths["summary"],
             clustered_topics_path=paths["clustered_topics"],
             output_headings_path=paths["headings"],
-            output_subheadings_path=paths["subheadings"]
+            output_subheadings_path=paths["subheadings"],
+            service=context_service,
+            api_key=context_api_key,
+            model=context_model,
+            base_url=context_base_url
         )
         
         # Step 2: Merge context and ontology
@@ -106,19 +131,17 @@ def run_pipeline(input_folder, output_folder, gene_set):
         )
         
         # Step 3: Generate visualizations
-        # Updated to use the correct parameter names for your generate_heatmaps function
         generate_heatmaps(
-            df_path=paths["merged"],  # Changed from merged_data_path
-            save_folder=os.path.join(output_folder, f"results/heatmaps/{gene_set}"),  # Changed from output_folder
-            log_file=paths["heatmap_log"]  # Changed from log_path
+            df_path=paths["merged"],
+            save_folder=os.path.join(output_folder, f"results/heatmaps/{gene_set}"),
+            log_file=paths["heatmap_log"]
         )
         
-        # Updated to use the correct parameter names for your generate_circle_plot function
         generate_circle_plot(
-            input_csv=paths["clustered_topics"],  # Changed from clustered_topics_path
-            headings_csv=paths["headings"],  # Changed from headings_path
-            output_html=paths["circle_plot"],  # Changed from output_path
-            extra_vectors_csv=paths["filtered_sets"]  # Changed from filtered_sets_path
+            input_csv=paths["clustered_topics"],
+            headings_csv=paths["headings"],
+            output_html=paths["circle_plot"],
+            extra_vectors_csv=paths["filtered_sets"]
         )
         
         # Step 4: Generate JSON summary

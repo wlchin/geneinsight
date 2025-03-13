@@ -14,6 +14,7 @@ import pandas as pd  # Add this import for reading CSV files
 import re
 import shutil
 import os
+import logging
 
 class IDToHyperlink:
     """
@@ -198,16 +199,20 @@ def generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api):
                 # Match subtitle with filtered_genesets_df
                 subtitle = section.get('subtitle')
                 if subtitle:
+                    logging.info(f"Fetching filtered row for subtitle: {subtitle}")
                     filtered_row = filtered_genesets_df[filtered_genesets_df['Term'] == subtitle]
+                    print(filtered_row)
                     if not filtered_row.empty:
                         odds_ratio = filtered_row['Odds Ratio'].values[0]
                         p_value = filtered_row['Adjusted P-value'].values[0]
                         combined_score = filtered_row['Combined Score'].values[0]
                     else:
+                        logging.warning(f"No filtered row found for subtitle: {subtitle}")
                         odds_ratio = random.uniform(0.5, 2.0)
                         p_value = random.uniform(0.01, 0.05)
                         combined_score = random.uniform(1, 10)
                 else:
+                    logging.warning("No subtitle found for section")
                     odds_ratio = random.uniform(0.5, 2.0)
                     p_value = random.uniform(0.01, 0.05)
                     combined_score = random.uniform(1, 10)

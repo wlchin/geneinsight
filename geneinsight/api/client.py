@@ -1,6 +1,4 @@
-"""
-Module for batch processing API calls with parallel execution.
-"""
+# geneinsight/api/client.py
 
 import os
 import logging
@@ -33,9 +31,11 @@ try:
 except ImportError:
     APIS_AVAILABLE = False
 
+
 class TopicHeading(BaseModel):
     """Pydantic model to represent a topic heading response."""
     topic: str = Field(..., description="A title for the subtopic")
+
 
 def fetch_subtopic_heading(
     user_prompt: str,
@@ -48,7 +48,7 @@ def fetch_subtopic_heading(
 ) -> str:
     """
     Get a subtopic heading from the API.
-    
+
     Args:
         user_prompt: The user portion of the prompt.
         system_prompt: The system portion of the prompt.
@@ -56,14 +56,18 @@ def fetch_subtopic_heading(
         api_key: API key.
         model: Model to use.
         base_url: Base URL for the API service.
-        
+
     Returns:
-        The generated topic heading.
+        The generated topic heading or an error string if something fails.
     """
     if not APIS_AVAILABLE:
         logger.warning("API modules (openai, instructor) not installed. Returning placeholder.")
         return "API_NOT_AVAILABLE"
-    
+
+    # Raise ValueError if the service is unsupported
+    if service.lower() not in {"openai", "together", "ollama"}:
+        raise ValueError(f"Unsupported service: {service}")
+
     try:
         # Initialize the appropriate client
         if service.lower() == "together":
@@ -75,8 +79,6 @@ def fetch_subtopic_heading(
         elif service.lower() == "ollama":
             ollama_client = OpenAI(api_key=api_key or "ollama", base_url=base_url)
             client = instructor.from_openai(ollama_client, mode=instructor.Mode.TOOLS)
-        else:
-            raise ValueError(f"Unsupported service: {service}")
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -88,12 +90,13 @@ def fetch_subtopic_heading(
             messages=messages,
             response_model=TopicHeading
         )
-        
+
         return response.topic if hasattr(response, 'topic') else str(response)
 
     except Exception as e:
         logger.error(f"{service.capitalize()} API call failed: {e}")
         return f"ERROR: {str(e)}"
+
 
 def process_subtopic_row(
     row: pd.Series,
@@ -105,14 +108,14 @@ def process_subtopic_row(
 ) -> Dict[str, Any]:
     """
     Process a single row for subtopic generation.
-    
+
     Args:
         row: Row from the prompts DataFrame.
         service: API service to use.
         api_key: API key.
         model: Model to use.
         base_url: Base URL for the API service.
-        
+
     Returns:
         Dictionary with the row data and generated result.
     """
@@ -128,7 +131,7 @@ def process_subtopic_row(
         f"It should emulate the tone and structure of a gene ontology term, incorporating specific details from the information provided. "
         f"Respond only with the subtopic heading."
     )
-    
+
     user_prompt = long_prompt + f"\n\nPROVIDED INFORMATION:\n{major_transcript}"
 
     generated_subtopic = fetch_subtopic_heading(
@@ -147,6 +150,7 @@ def process_subtopic_row(
         "generated_result": generated_subtopic
     }
 
+
 def batch_process_api_calls(
     prompts_csv: str,
     output_api: str,
@@ -157,7 +161,7 @@ def batch_process_api_calls(
 ) -> pd.DataFrame:
     """
     Batch process API calls for subtopic generation.
-    
+
     Args:
         prompts_csv: Path to CSV with the input prompts.
         output_api: Path to output CSV for results.
@@ -165,7 +169,7 @@ def batch_process_api_calls(
         model: Which model to use.
         base_url: Base URL for the API service.
         n_jobs: Number of parallel workers.
-        
+
     Returns:
         DataFrame with the results.
     """
@@ -180,7 +184,8 @@ def batch_process_api_calls(
         pd.DataFrame().to_csv(output_api, index=False)
         return pd.DataFrame()
 
-    # Get the API key from environment variables
+    # For openai/together, we read the environment variable
+    # For ollama, we always set "ollama" if not provided
     api_key = None
     if service.lower() == "together":
         api_key = os.getenv("TOGETHER_API_KEY")
@@ -189,7 +194,7 @@ def batch_process_api_calls(
     elif service.lower() == "ollama":
         api_key = "ollama"
 
-    if not api_key and service.lower() not in ["ollama"]:
+    if not api_key and service.lower() != "ollama":
         raise ValueError(f"API key for {service} not found in .env file or environment variables.")
 
     logger.info(f"Processing {len(df_subtopic)} rows with {n_jobs} parallel jobs")
@@ -205,9 +210,10 @@ def batch_process_api_calls(
     )
 
     df_results = pd.DataFrame(results)
-    
+
+    # Ensure the output path directory exists
     os.makedirs(os.path.dirname(output_api), exist_ok=True)
     df_results.to_csv(output_api, index=False)
     logger.info(f"Results saved to {output_api}")
-    
+
     return df_results

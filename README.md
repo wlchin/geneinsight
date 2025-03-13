@@ -100,7 +100,7 @@ options:
                         Title for the generated report.
   --species SPECIES     Species identifier (default: 9606 for human).
   -v {none,debug,info,warning,error,critical}, --verbosity {none,debug,info,warning,error,critical}
-                        Set logging verbosity. Use 'none' to disable logging. Default is 'info'.
+                        Set logging verbosity. Use 'none' to disable logging. Default is 'none'.
 ```
 
 ## API Support

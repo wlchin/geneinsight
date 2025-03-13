@@ -124,7 +124,6 @@ class Pipeline:
         overlap = query_genes.intersection(background_genes)
         if not overlap:
             logger.error("No common items between the query gene set and the background gene list. Aborting pipeline.")
-            # You can raise an exception or simply return.
             raise ValueError("No overlap found between query gene set and background. Pipeline aborted.")
         
         try:
@@ -154,9 +153,6 @@ class Pipeline:
                 summary_df, query_gene_set, background_gene_list
             )
 
-            # ---------------------------------------------------------------------
-            # NEW CHECK #2: Ensure enriched_df is not empty.
-            # ---------------------------------------------------------------------
             if enriched_df.empty:
                 logger.error("No results from hypergeometric enrichment. Aborting pipeline.")
                 raise ValueError("Hypergeometric enrichment resulted in an empty DataFrame. Pipeline aborted.")
@@ -173,8 +169,6 @@ class Pipeline:
             logger.info("Step 9: Filtering topics by similarity")
             filtered_df = self._filter_topics(key_topics_df)
             
-            # If the filtered DataFrame has fewer than the target rows (default: 25), 
-            # then use the entire enriched DataFrame as input for filtering and clustering.
             if len(filtered_df) < self.target_filtered_topics:
                 logger.info("Filtered topics fewer than target; using entire enriched dataframe for filtering and clustering.")
                 filtered_df = self._filter_topics(enriched_df)
@@ -273,7 +267,7 @@ class Pipeline:
                     logger.info(f"Removing original sphinx_builds folder: {sphinx_source_path}")
                     shutil.rmtree(sphinx_source_path)
                     
-                    logger.info(f"Renaming temporary sphinx_builds folder to final location")
+                    logger.info("Renaming temporary sphinx_builds folder to final location")
                     os.rename(sphinx_temp_path, sphinx_source_path)
                 else:
                     logger.warning(f"Nested sphinx_builds directory not found: {sphinx_nested_builds}")
@@ -322,7 +316,7 @@ class Pipeline:
         enrichment_df, documents = process_gene_enrichment(
             input_file=query_gene_set,
             output_dir=self.dirs["enrichment"],
-            species=self.species,  # Use the species from the instance variable
+            species=self.species,
             mode="single"
         )
         
@@ -335,7 +329,6 @@ class Pipeline:
         documents_path = os.path.join(self.dirs["enrichment"], "documents_for_modeling.csv")
         topics_output = os.path.join(self.dirs["topics"], "topics.csv")
         
-        # Save documents to CSV first
         documents_df.to_csv(documents_path, index=False)
         
         topics_df = run_multiple_seed_topic_modeling(
@@ -357,7 +350,6 @@ class Pipeline:
         topics_path = os.path.join(self.dirs["topics"], "topics.csv")
         prompts_output = os.path.join(self.dirs["prompts"], "prompts.csv")
         
-        # Save topics to CSV first (if not already saved)
         if not os.path.exists(topics_path):
             topics_df.to_csv(topics_path, index=False)
         
@@ -532,7 +524,17 @@ class Pipeline:
             logger.error(f"Failed to import geneinsight.reports.pipeline: {e}")
             return None
 
-        status, html_index = reports_pipeline.run_pipeline(input_folder, report_out_dir, gene_set)
+        # Pass the API service parameters to the report pipeline so that it uses the
+        # correct service (e.g., "openai" or "ollama") along with model and base URL.
+        status, html_index = reports_pipeline.run_pipeline(
+            input_folder,
+            report_out_dir,
+            gene_set,
+            context_service=self.api_service,
+            context_api_key=None,  # If needed, pass your API key here
+            context_model=self.api_model,
+            context_base_url=self.api_base_url
+        )
         if status and html_index:
             logger.info(f"Report generated successfully at {html_index}")
             return html_index

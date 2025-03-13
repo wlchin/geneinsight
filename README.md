@@ -23,8 +23,6 @@ Geneinsight provides a comprehensive pipeline for analyzing gene sets through to
 Requires Python 3.9 or higher.
 
 ```bash
-# Install from PyPI
-pip install geneinsight
 
 # Install directly from GitHub
 pip install git+https://github.com/yourusername/geneinsight.git
@@ -54,7 +52,7 @@ geneinsight query_genes.txt background_genes.txt \
 # Using Ollama with local LLM
 geneinsight query_genes.txt background_genes.txt \
   --api_service ollama \
-  --api_model llama3:latest \
+  --api_model llama3.1:8b \
   --api_base_url "http://localhost:11434/v1"
 ```
 
@@ -110,13 +108,13 @@ options:
 Geneinsight supports two API services for topic refinement:
 
 1. **OpenAI API**: Default option that works with models like gpt-4o-mini
-   - Requires an API key to be set in environment variables
+   - Requires an API key to be set in environment variables, or alternatively a .env file.
    - Works out of the box with default settings
 
 2. **Ollama API**: Local option for running models on your own hardware
    - Requires a model that supports tool use (see [supported models](https://ollama.com/search?c=tools))
    - Requires setting the `--api_base_url` parameter, usually to `"http://localhost:11434/v1"`
-   - Example usage: `--api_service ollama --api_model llama3:latest --api_base_url "http://localhost:11434/v1"`
+   - Example usage: `--api_service ollama --api_model llama3:8.1b --api_base_url "http://localhost:11434/v1"`
 
 ## Environment Variables
 

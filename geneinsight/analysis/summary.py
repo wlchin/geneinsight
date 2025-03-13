@@ -127,7 +127,7 @@ class RAGModule:
         unique_genes_str = json.dumps(unique_genes)
 
         rows = []
-        for ref in references:
+        for ref in tqdm(references, desc="Processing references"):
             rows.append({
                 "query": query,
                 "context": context_str,  

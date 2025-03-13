@@ -89,7 +89,7 @@ def generate_circle_plot(
         
         main_terms = df['Term'].tolist()
         logger.info(f"Embedding {len(main_terms)} main terms")
-        main_embeddings = model.encode(main_terms)
+        main_embeddings = model.encode(main_terms, show_progress_bar=False)
 
         # If extra terms are provided, encode them and combine with the main embeddings
         if extra_terms:

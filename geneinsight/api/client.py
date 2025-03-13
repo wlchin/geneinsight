@@ -91,7 +91,8 @@ def fetch_subtopic_heading(
         response: TopicHeading = client.chat.completions.create(
             model=model,
             messages=messages,
-            response_model=TopicHeading
+            response_model=TopicHeading,
+            temperature = 0.2
         )
 
         return response.topic if hasattr(response, 'topic') else str(response)

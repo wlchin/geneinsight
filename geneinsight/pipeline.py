@@ -120,7 +120,8 @@ class Pipeline:
         if not overlap:
             logger.error("No common items between query gene set and background. Aborting pipeline.")
             raise ValueError("No overlap found between query gene set and background. Pipeline aborted.")
-
+        else:
+            logger.info(f"Found {len(overlap)} overlapping genes between query and background.")
         try:
             # Step 1: Gene enrichment from StringDB
             self.console.rule("[bold cyan]Step 1: Retrieving gene enrichment data from StringDB[/bold cyan]")
@@ -128,10 +129,12 @@ class Pipeline:
 
             # Step 2: Topic modeling
             self.console.rule("[bold cyan]Step 2: Running topic modeling[/bold cyan]")
+            self.console.print(f"Running topic modeling with {self.n_samples} samples")
             topics_df = self._run_topic_modeling(documents_df)
 
             # Step 3: Prompt generation
             self.console.rule("[bold cyan]Step 3: Generating prompts for topic refinement[/bold cyan]")
+            self.console.print("Generating prompts for API calls")
             prompts_df = self._generate_prompts(topics_df)
 
             # Step 4: API processing
@@ -140,10 +143,12 @@ class Pipeline:
 
             # Step 5: Create summary
             self.console.rule("[bold cyan]Step 5: Creating summary[/bold cyan]")
+            self.console.print("Creating summary by combining API results with enrichment data")
             summary_df = self._create_summary(api_results_df, enrichment_df)
 
             # Step 6: Hypergeometric enrichment
-            self.console.rule("[bold cyan]Step 6: Performing hypergeometric enrichment[/bold cyan]")
+            self.console.rule("[bold cyan]Step 6: Performing gene set enrichment[/bold cyan]")
+            self.console.print("Performing enrichment analysis to detect enriched gene sets")
             enriched_df = self._perform_hypergeometric_enrichment(
                 summary_df, query_gene_set, background_gene_list
             )
@@ -154,6 +159,7 @@ class Pipeline:
 
             # Step 7: Topic modeling on filtered gene sets (meta-analysis)
             self.console.rule("[bold cyan]Step 7: Running topic modeling on filtered gene sets[/bold cyan]")
+            self.console.print("Detecting key topics (centroids) from the enriched gene sets")
             topics_df = self._run_topic_modeling_on_filtered_sets(enriched_df)
 
             # Step 8: Extract key topics
@@ -170,6 +176,7 @@ class Pipeline:
 
             # Step 9b: Clustering filtered topics
             self.console.rule("[bold cyan]Step 9b: Clustering filtered topics[/bold cyan]")
+            self.console.print("Creating hierarchical summaries")
             clustered_df = self._run_clustering(filtered_df)
 
             # Step 9c: Ontology enrichment analysis

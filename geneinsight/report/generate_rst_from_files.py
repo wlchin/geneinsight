@@ -201,7 +201,6 @@ def generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api):
                 if subtitle:
                     logging.info(f"Fetching filtered row for subtitle: {subtitle}")
                     filtered_row = filtered_genesets_df[filtered_genesets_df['Term'] == subtitle]
-                    print(filtered_row)
                     if not filtered_row.empty:
                         odds_ratio = filtered_row['Odds Ratio'].values[0]
                         p_value = filtered_row['Adjusted P-value'].values[0]

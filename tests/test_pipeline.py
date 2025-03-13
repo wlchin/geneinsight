@@ -89,7 +89,11 @@ def mock_prompts_df():
     """Create a mock prompts DataFrame."""
     return pd.DataFrame({
         "topic_id": [0, 1, 2],
-        "prompt": ["Summarize gene, protein, pathway", "Summarize disease, cell, tissue", "Summarize mutation, cancer, therapy"]
+        "prompt": [
+            "Summarize gene, protein, pathway",
+            "Summarize disease, cell, tissue",
+            "Summarize mutation, cancer, therapy"
+        ]
     })
 
 @pytest.fixture
@@ -97,8 +101,16 @@ def mock_api_results_df():
     """Create a mock API results DataFrame."""
     return pd.DataFrame({
         "topic_id": [0, 1, 2],
-        "response": ["Response for topic 0", "Response for topic 1", "Response for topic 2"],
-        "subtopics": ["subtopic1, subtopic2", "subtopic3, subtopic4", "subtopic5, subtopic6"]
+        "response": [
+            "Response for topic 0",
+            "Response for topic 1",
+            "Response for topic 2"
+        ],
+        "subtopics": [
+            "subtopic1, subtopic2",
+            "subtopic3, subtopic4",
+            "subtopic5, subtopic6"
+        ]
     })
 
 @pytest.fixture
@@ -203,10 +215,20 @@ class TestPipelineInit:
 # Tests for individual pipeline methods
 class TestPipelineMethods:
     @patch("geneinsight.enrichment.stringdb.process_gene_enrichment")
-    def test_get_stringdb_enrichment(self, mock_process, pipeline, mock_files, mock_enrichment_df, mock_documents_df):
+    def test_get_stringdb_enrichment(
+        self, 
+        mock_process, 
+        pipeline, 
+        mock_files, 
+        mock_enrichment_df, 
+        mock_documents_df
+    ):
         """Test the _get_stringdb_enrichment method."""
         # Setup the mock
-        mock_process.return_value = (mock_enrichment_df, ["Description 1", "Description 2", "Description 3"])
+        mock_process.return_value = (
+            mock_enrichment_df,
+            ["Description 1", "Description 2", "Description 3"]
+        )
         
         # Call the method
         enrichment_df, documents_df = pipeline._get_stringdb_enrichment(mock_files["query"])
@@ -215,6 +237,7 @@ class TestPipelineMethods:
         mock_process.assert_called_once_with(
             input_file=mock_files["query"],
             output_dir=pipeline.dirs["enrichment"],
+            species=pipeline.species,   # <-- This is important now
             mode="single"
         )
         
@@ -224,7 +247,13 @@ class TestPipelineMethods:
         assert "description" in documents_df.columns
     
     @patch("geneinsight.models.bertopic.run_multiple_seed_topic_modeling")
-    def test_run_topic_modeling(self, mock_topic_modeling, pipeline, mock_documents_df, mock_topics_df):
+    def test_run_topic_modeling(
+        self, 
+        mock_topic_modeling, 
+        pipeline, 
+        mock_documents_df, 
+        mock_topics_df
+    ):
         """Test the _run_topic_modeling method."""
         # Setup the mock
         mock_topic_modeling.return_value = mock_topics_df
@@ -242,7 +271,13 @@ class TestPipelineMethods:
         pd.testing.assert_frame_equal(result, mock_topics_df)
     
     @patch("geneinsight.workflows.prompt_generation.generate_prompts")
-    def test_generate_prompts(self, mock_generate_prompts, pipeline, mock_topics_df, mock_prompts_df):
+    def test_generate_prompts(
+        self, 
+        mock_generate_prompts, 
+        pipeline, 
+        mock_topics_df, 
+        mock_prompts_df
+    ):
         """Test the _generate_prompts method."""
         # Setup the mock
         mock_generate_prompts.return_value = mock_prompts_df
@@ -257,7 +292,13 @@ class TestPipelineMethods:
         pd.testing.assert_frame_equal(result, mock_prompts_df)
     
     @patch("geneinsight.api.client.batch_process_api_calls")
-    def test_process_api_calls(self, mock_api_calls, pipeline, mock_prompts_df, mock_api_results_df):
+    def test_process_api_calls(
+        self, 
+        mock_api_calls, 
+        pipeline, 
+        mock_prompts_df, 
+        mock_api_results_df
+    ):
         """Test the _process_api_calls method."""
         # Setup the mock
         mock_api_calls.return_value = mock_api_results_df
@@ -275,7 +316,14 @@ class TestPipelineMethods:
         pd.testing.assert_frame_equal(result, mock_api_results_df)
     
     @patch("geneinsight.analysis.summary.create_summary")
-    def test_create_summary(self, mock_create_summary, pipeline, mock_api_results_df, mock_enrichment_df, mock_summary_df):
+    def test_create_summary(
+        self, 
+        mock_create_summary, 
+        pipeline, 
+        mock_api_results_df, 
+        mock_enrichment_df, 
+        mock_summary_df
+    ):
         """Test the _create_summary method."""
         # Setup the mock
         mock_create_summary.return_value = mock_summary_df
@@ -284,20 +332,33 @@ class TestPipelineMethods:
         result = pipeline._create_summary(mock_api_results_df, mock_enrichment_df)
         
         # Verify the call
-        mock_create_summary.assert_called_once_with(mock_api_results_df, mock_enrichment_df, ANY)
+        mock_create_summary.assert_called_once_with(
+            mock_api_results_df, 
+            mock_enrichment_df, 
+            ANY
+        )
         
         # Check results
         pd.testing.assert_frame_equal(result, mock_summary_df)
     
     @patch("geneinsight.enrichment.hypergeometric.hypergeometric_enrichment")
-    def test_perform_hypergeometric_enrichment(self, mock_enrichment, pipeline, mock_summary_df, mock_files, mock_enriched_df):
+    def test_perform_hypergeometric_enrichment(
+        self, 
+        mock_enrichment, 
+        pipeline, 
+        mock_summary_df, 
+        mock_files, 
+        mock_enriched_df
+    ):
         """Test the _perform_hypergeometric_enrichment method."""
         # Setup the mock
         mock_enrichment.return_value = mock_enriched_df
         
         # Call the method
         result = pipeline._perform_hypergeometric_enrichment(
-            mock_summary_df, mock_files["query"], mock_files["background"]
+            mock_summary_df, 
+            mock_files["query"], 
+            mock_files["background"]
         )
         
         # Verify the call
@@ -308,7 +369,13 @@ class TestPipelineMethods:
         pd.testing.assert_frame_equal(result, mock_enriched_df)
     
     @patch("geneinsight.models.meta.run_multiple_seed_topic_modeling")
-    def test_run_topic_modeling_on_filtered_sets(self, mock_topic_modeling, pipeline, mock_enriched_df, mock_topics_df):
+    def test_run_topic_modeling_on_filtered_sets(
+        self, 
+        mock_topic_modeling, 
+        pipeline, 
+        mock_enriched_df, 
+        mock_topics_df
+    ):
         """Test the _run_topic_modeling_on_filtered_sets method."""
         # Setup the mock
         mock_topic_modeling.return_value = mock_topics_df
@@ -326,7 +393,13 @@ class TestPipelineMethods:
         pd.testing.assert_frame_equal(result, mock_topics_df)
     
     @patch("geneinsight.analysis.counter.count_top_terms")
-    def test_get_key_topics(self, mock_count_terms, pipeline, mock_topics_df, mock_key_topics_df):
+    def test_get_key_topics(
+        self, 
+        mock_count_terms, 
+        pipeline, 
+        mock_topics_df, 
+        mock_key_topics_df
+    ):
         """Test the _get_key_topics method."""
         # Setup the mock
         mock_count_terms.return_value = mock_key_topics_df
@@ -358,12 +431,18 @@ class TestPipelineMethods:
         pd.testing.assert_frame_equal(result, mock_enriched_df)
     
     @patch("geneinsight.analysis.clustering.run_clustering")
-    def test_run_clustering(self, mock_clustering, pipeline, mock_enriched_df, mock_clustered_df):
+    def test_run_clustering(
+        self, 
+        mock_clustering, 
+        pipeline, 
+        mock_enriched_df, 
+        mock_clustered_df
+    ):
         """Test the _run_clustering method."""
         # Setup the mocks
-        mock_clustering.return_value = None  # Function doesn't return the DataFrame
+        mock_clustering.return_value = None  # The function doesn't return the DataFrame
         
-        # Create a patch for pd.read_csv
+        # Create a patch for pd.read_csv to simulate reading the clustered data
         with patch('pandas.read_csv', return_value=mock_clustered_df):
             # Call the method
             result = pipeline._run_clustering(mock_enriched_df)
@@ -400,16 +479,30 @@ class TestPipelineMethods:
         assert metadata["api_service"][0] == pipeline.api_service
     
     @patch("geneinsight.pipeline.OntologyWorkflow")
-    def test_perform_ontology_enrichment(self, mock_ontology_workflow, pipeline, mock_summary_df, mock_clustered_df, mock_files, mock_ontology_dict_df):
+    def test_perform_ontology_enrichment(
+        self, 
+        mock_ontology_workflow, 
+        pipeline, 
+        mock_summary_df, 
+        mock_clustered_df, 
+        mock_files, 
+        mock_ontology_dict_df
+    ):
         """Test the _perform_ontology_enrichment method."""
         # Setup the mock
         mock_workflow_instance = MagicMock()
-        mock_workflow_instance.process_dataframes.return_value = (mock_clustered_df, mock_ontology_dict_df)
+        mock_workflow_instance.process_dataframes.return_value = (
+            mock_clustered_df, 
+            mock_ontology_dict_df
+        )
         mock_ontology_workflow.return_value = mock_workflow_instance
         
         # Call the method
         result = pipeline._perform_ontology_enrichment(
-            mock_summary_df, mock_clustered_df, mock_files["query"], mock_files["background"]
+            mock_summary_df, 
+            mock_clustered_df, 
+            mock_files["query"], 
+            mock_files["background"]
         )
         
         # Verify the calls
@@ -457,7 +550,14 @@ class TestPipelineDirectoryOperations:
     @patch("geneinsight.pipeline.shutil.copytree")
     @patch("geneinsight.pipeline.os.rename")
     @patch("os.path.exists", return_value=True)
-    def test_reorganize_output_directory(self, mock_exists, mock_rename, mock_copytree, mock_rmtree, pipeline):
+    def test_reorganize_output_directory(
+        self, 
+        mock_exists, 
+        mock_rename, 
+        mock_copytree, 
+        mock_rmtree, 
+        pipeline
+    ):
         """Test the _reorganize_output_directory method."""
         output_path = os.path.join(pipeline.dirs["final"], "test_run")
         
@@ -465,9 +565,9 @@ class TestPipelineDirectoryOperations:
         pipeline._reorganize_output_directory(output_path)
         
         # Verify the calls
-        assert mock_rmtree.call_count >= 1  # Should be called for ontology folder and original sphinx_builds
-        assert mock_copytree.call_count == 1  # Should be called to copy sphinx_builds
-        assert mock_rename.call_count == 1  # Should be called to rename temp sphinx_builds
+        assert mock_rmtree.call_count >= 1  # Called for ontology folder + original sphinx_builds
+        assert mock_copytree.call_count == 1  # Copying sphinx_builds
+        assert mock_rename.call_count == 1    # Renaming the temp sphinx_builds
     
     @patch("geneinsight.utils.zip_helper.zip_directory")
     def test_zip_results_folders(self, mock_zip, pipeline, temp_dir):
@@ -505,5 +605,3 @@ class TestPipelineDirectoryOperations:
         # Verify the call
         mock_run_pipeline.assert_called_once()
         assert report_path == "/path/to/index.html"
-
-

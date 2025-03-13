@@ -1,0 +1,14 @@
+[run]
+source = geneinsight
+omit = 
+    */geneinsight/scripts/*
+    */tests/*
+    */__init__.py
+    */setup.py
+    */geneinsight/report/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError

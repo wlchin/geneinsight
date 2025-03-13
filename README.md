@@ -1,5 +1,9 @@
 # Geneinsight
 
+![MIT License](https://img.shields.io/badge/license-MIT-blue)
+![Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen)
+![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)
+
 A Python package for topic modeling of gene sets with enrichment analysis. 
 
 ## Overview
@@ -16,16 +20,19 @@ Geneinsight provides a comprehensive pipeline for analyzing gene sets through to
 
 ## Installation
 
+Requires Python 3.9 or higher.
+
 ```bash
-# Clone the repository
+# Install from PyPI
+pip install geneinsight
+
+# Install directly from GitHub
+pip install git+https://github.com/yourusername/geneinsight.git
+
+# Clone the repository and install in development mode
 git clone https://github.com/yourusername/geneinsight.git
 cd geneinsight
-
-# Install the package
 pip install -e .
-
-# Or install directly from GitHub
-pip install git+https://github.com/yourusername/geneinsight.git
 ```
 
 ## Quick Start

@@ -38,7 +38,7 @@ class RAGModule:
 
     def get_top_documents(self, query, N=5):
         logging.info("Entering get_top_documents() with query='%s' and N=%d", query, N)
-        query_embedding = self.embedder.encode(str(query), convert_to_tensor=True)
+        query_embedding = self.embedder.encode(str(query), convert_to_tensor=True, show_progress_bar=False)
         cosine_scores = util.pytorch_cos_sim(query_embedding, self.document_embeddings)[0]
         top_results_indices = torch.topk(cosine_scores, k=N).indices.cpu()  # move to CPU before converting
         logging.info("Top documents indices: %s", top_results_indices.tolist())

@@ -63,6 +63,7 @@ class HypergeometricGSEA:
         logger.debug("Hypergeometric GSEA completed.")
         return enr.res2d
 
+
 class OntologyReader:
     """
     A class that reads an ontology file and constructs a dictionary mapping ontology terms 
@@ -94,6 +95,7 @@ class OntologyReader:
         gene_dict = df.set_index('name')['gene_list'].to_dict()
         logger.debug(f"Read {len(gene_dict)} ontology terms from {os.path.basename(filepath)}.")
         return gene_dict
+
 
 class RAGModuleGSEAPY:
     """
@@ -201,8 +203,8 @@ class RAGModuleGSEAPY:
         self.hypergeometric_gsea_obj = HypergeometricGSEA(gene_list, background_list)
         self.get_enrichment(fdr_threshold=fdr_threshold)  # Updates self.enrichr_results
 
+        # If no significant enrichment results, return early
         if self.enrichr_results is None or self.enrichr_results.empty:
-            # No enrichment results found
             logger.info("No significant terms found. Returning empty results.")
             return (
                 [],
@@ -212,12 +214,16 @@ class RAGModuleGSEAPY:
                 "No significant terms found at the specified FDR threshold."
             )
 
+        # Compute embeddings
         documents = self.enrichr_results["Term"].tolist()
         logger.debug(f"Computing embeddings for {len(documents)} documents.")
         document_embeddings = self.embedder.encode(documents, convert_to_tensor=True)
         query_embedding = self.embedder.encode(query, convert_to_tensor=True)
+
+        # Cosine similarity
         cosine_scores = util.pytorch_cos_sim(query_embedding, document_embeddings)[0]
 
+        # Determine top-k
         k_val = min(N, len(documents))
         if k_val == 0:
             logger.warning("No documents found or insufficient documents to compute topk.")
@@ -228,43 +234,69 @@ class RAGModuleGSEAPY:
                 pd.DataFrame(),
                 "No significant terms found at the specified FDR threshold."
             )
+
         try:
             top_results_indices = torch.topk(cosine_scores, k=k_val).indices.tolist()
         except RuntimeError as e:
             logger.warning(f"RuntimeError occurred in topk computation: {e}")
             top_results_indices = []
+            err_msg = f"RuntimeError occurred in topk computation: {e}"
+            return (
+                top_results_indices,
+                err_msg,
+                self.enrichr_results,
+                pd.DataFrame(),
+                err_msg
+            )
 
         logger.debug(f"Top {N} indices: {top_results_indices}")
 
+        # Format the top documents
         extracted_items, enrichr_df_filtered = self.format_top_documents(top_results_indices)
+
+        # Store cosine scores in the overall results
         self.enrichr_results["cosine_score"] = cosine_scores.tolist()
 
-        # extracted_items is the formatted_output_str from format_top_documents
+        # Return everything
         return top_results_indices, extracted_items, self.enrichr_results, enrichr_df_filtered, extracted_items
 
     def format_top_documents(self, top_results_indices):
-        """
-        Format the top documents into a readable list with their FDR and sets.
+            """
+            Format the top documents into a readable list with their FDR and sets.
+            Disallow negative indices to treat them as out-of-bounds.
+            """
+            # If we have no data or an empty index list, return early
+            if (
+                self.enrichr_results is None
+                or self.enrichr_results.empty
+                or not top_results_indices
+            ):
+                return "", pd.DataFrame()
 
-        Parameters
-        ----------
-        top_results_indices : list of int
-            Indices of top documents.
+            # Explicitly disallow negative indices
+            if any(idx < 0 for idx in top_results_indices):
+                logger.warning(
+                    "IndexError: Negative indices are disallowed. Returning empty results."
+                )
+                return "", pd.DataFrame()
 
-        Returns
-        -------
-        tuple
-            (formatted_output_str, filtered_dataframe)
-        """
-        df_filtered = self.enrichr_results.iloc[top_results_indices]
-        logger.debug(f"Formatting top {len(top_results_indices)} documents.")
-        output = []
-        for _, row in df_filtered.iterrows():
-            output.append(
-                f"* `{row['Gene_set']}: {row['Term']} - FDR: {row['Adjusted P-value']:.4f}`"
-            )
-        formatted_output = "\n".join(output)
-        return formatted_output, df_filtered
+            # Try to index the results
+            try:
+                df_filtered = self.enrichr_results.iloc[top_results_indices]
+            except IndexError:
+                logger.warning(
+                    "IndexError: Attempted to index out-of-bounds in enrichr_results. Returning empty results."
+                )
+                return "", pd.DataFrame()
+
+            logger.debug(f"Formatting top {len(top_results_indices)} documents.")
+            output = []
+            for _, row in df_filtered.iterrows():
+                output.append(
+                    f"* `{row['Gene_set']}: {row['Term']} - FDR: {row['Adjusted P-value']:.4f}`"
+                )
+            formatted_output = "\n".join(output)
+            return formatted_output, df_filtered
 
 
 def main():

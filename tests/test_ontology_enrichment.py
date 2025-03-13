@@ -5,6 +5,7 @@ import pytest
 import tempfile
 import pandas as pd
 import torch
+import logging
 from unittest.mock import patch, MagicMock
 from geneinsight.ontology.calculate_ontology_enrichment import (
     HypergeometricGSEA,
@@ -144,7 +145,6 @@ def test_hypergeometric_gsea_perform_raises_exception(mock_enrich, mock_genelist
     mock_enrich.side_effect = RuntimeError("Mock error in enrich")
 
     # Create a minimal RAGModuleGSEAPY
-    # Provide a single OntologyReader with a small dict
     class MockOntologyReader:
         name = "MockOntology"
         gene_dict = {"TermSet1": ["GENE1", "GENE2"]}
@@ -328,11 +328,11 @@ def test_ragmodule_get_top_documents_n_larger_than_docs(
 @patch("geneinsight.ontology.calculate_ontology_enrichment.SentenceTransformer")
 @patch("geneinsight.ontology.calculate_ontology_enrichment.gp.enrich")
 def test_ragmodule_get_top_documents_raise_runtime_error_in_topk(
-    mock_enrich, mock_transformer_cls, mock_util, mock_topk, mock_ontologies, mock_genelist
+    mock_enrich, mock_transformer_cls, mock_util, mock_topk, mock_ontologies, mock_genelist, caplog
 ):
     """
     Test get_top_documents scenario where torch.topk raises a RuntimeError.
-    Ensures we catch the exception and return empty top_results_indices.
+    Ensures we catch the exception and return empty top_results_indices and the message.
     """
     import torch
     # Setup mocks
@@ -360,23 +360,27 @@ def test_ragmodule_get_top_documents_raise_runtime_error_in_topk(
     mock_topk.side_effect = RuntimeError("Mock topk error")
 
     rag_module = RAGModuleGSEAPY(mock_ontologies)
-    (
-        top_indices,
-        extracted_items,
-        enrichr_results,
-        enrichr_df_filtered,
-        formatted_output
-    ) = rag_module.get_top_documents(
-        query="Sample query",
-        gene_list=mock_genelist,
-        background_list=None,
-        N=5,
-        fdr_threshold=0.1
-    )
+    with caplog.at_level(logging.WARNING):
+        (
+            top_indices,
+            extracted_items,
+            enrichr_results,
+            enrichr_df_filtered,
+            formatted_output
+        ) = rag_module.get_top_documents(
+            query="Sample query",
+            gene_list=mock_genelist,
+            background_list=None,
+            N=5,
+            fdr_threshold=0.1
+        )
 
     # Should return an empty list for top_indices
     assert top_indices == []
-    assert "RuntimeError occurred in topk computation" in extracted_items
+    # We also expect the error message to appear in 'extracted_items'
+    assert "RuntimeError occurred in topk computation: Mock topk error" in extracted_items
+    # Confirm the log message was written
+    assert "RuntimeError occurred in topk computation: Mock topk error" in caplog.text
 
 
 @patch("geneinsight.ontology.calculate_ontology_enrichment.util")
@@ -491,14 +495,38 @@ def test_ragmodule_format_top_documents_with_empty_indices():
     assert filtered_df.empty
 
 
+@pytest.mark.parametrize("invalid_indices", [[0, 999], [999], [-1]])
+def test_ragmodule_format_top_documents_out_of_bounds(invalid_indices, caplog):
+    """
+    Test that format_top_documents logs a warning and returns empty results 
+    if we pass invalid index positions (e.g., out of range or negative).
+    """
+    rag_module = RAGModuleGSEAPY(ontology_object_list=[])
+    rag_module.enrichr_results = pd.DataFrame({
+        "Term": ["TermA", "TermB"],
+        "Adjusted P-value": [0.05, 0.01],
+        "Gene_set": ["Ontology1", "Ontology2"]
+    })
+
+    with caplog.at_level(logging.WARNING):
+        formatted_str, filtered_df = rag_module.format_top_documents(invalid_indices)
+
+    # We should see a warning about out-of-bounds
+    assert "IndexError: Attempted to index out-of-bounds" in caplog.text
+    # Both return values should be empty
+    assert formatted_str == ""
+    assert filtered_df.empty
+
+
 def test_ragmodule_format_top_documents_no_enrichr_results():
     """
-    Test that format_top_documents returns empty results if self.enrichr_results is empty.
+    Test that format_top_documents returns empty results if self.enrichr_results is empty,
+    even if indices are requested.
     """
     rag_module = RAGModuleGSEAPY(ontology_object_list=[])
     rag_module.enrichr_results = pd.DataFrame()  # empty
 
-    # Even if we have some indices, there's no data to index into
+    # Even if we specify some indices, there's nothing to index
     formatted_str, filtered_df = rag_module.format_top_documents([0, 1])
     assert formatted_str == ""
     assert filtered_df.empty

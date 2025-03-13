@@ -242,12 +242,41 @@ class Pipeline:
         try:
             results_dir = self.dirs["final"]
             logger.debug(f"Reorganizing output directory structure in: {results_dir}")
-
+            
+            # Get the run directory (where API calls, clustering, etc. outputs are stored)
+            # This should be the output_path parameter which is the run_dir from _finalize_outputs
+            run_dir = output_path
+            if not os.path.isdir(run_dir):
+                logger.warning(f"Run directory not found: {run_dir}")
+                run_dir = results_dir
+            
+            # Handle ontology folder - move contents to the run directory
             ontology_path = os.path.join(results_dir, "ontology")
             if os.path.exists(ontology_path):
-                logger.debug(f"Removing ontology folder: {ontology_path}")
+                logger.debug(f"Moving contents of ontology folder to run directory: {ontology_path} -> {run_dir}")
+                # List all files and directories in the ontology folder
+                ontology_contents = os.listdir(ontology_path)
+                for item in ontology_contents:
+                    src_path = os.path.join(ontology_path, item)
+                    dst_path = os.path.join(run_dir, item)
+                    
+                    # Handle name conflicts by adding a suffix if needed
+                    if os.path.exists(dst_path):
+                        base, ext = os.path.splitext(item)
+                        dst_path = os.path.join(run_dir, f"{base}_ontology{ext}")
+                        logger.debug(f"Renaming {item} to {os.path.basename(dst_path)} to avoid conflicts")
+                    
+                    # Move the item to run directory
+                    if os.path.isdir(src_path):
+                        shutil.copytree(src_path, dst_path)
+                    else:
+                        shutil.copy2(src_path, dst_path)
+                
+                # Remove the original ontology folder after moving contents
+                logger.debug(f"Removing original ontology folder after moving contents: {ontology_path}")
                 shutil.rmtree(ontology_path)
-
+            
+            # Handle sphinx builds directory
             sphinx_source_path = os.path.join(results_dir, "sphinx_builds")
             if os.path.exists(sphinx_source_path):
                 sphinx_nested_builds = os.path.join(sphinx_source_path, "results", "sphinx_builds")
@@ -263,10 +292,10 @@ class Pipeline:
                     logger.warning(f"Nested sphinx_builds directory not found: {sphinx_nested_builds}")
             else:
                 logger.warning(f"Sphinx builds directory not found: {sphinx_source_path}")
-
+            
             self._zip_results_folders(results_dir)
             logger.debug("Output directory reorganization completed")
-
+        
         except Exception as e:
             logger.error(f"Error reorganizing output directory: {e}", exc_info=True)
 

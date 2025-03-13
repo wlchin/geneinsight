@@ -26,12 +26,17 @@ class TestGeneInsightCLI:
         with patch.object(sys, "argv", test_args):
             main()
 
-        # Ensure Pipeline was called with default parameters
+        # Ensure Pipeline was called exactly once
         mock_pipeline.assert_called_once()
-        pipeline_init_args, _ = mock_pipeline.call_args
 
-        # Check that defaults and required args match
-        assert pipeline_init_args[0] == {
+        # Unpack the Pipeline call
+        call_args, call_kwargs = mock_pipeline.call_args
+
+        # Pipeline is called only with keyword arguments, so `call_args` should be empty
+        assert call_args == (), "Pipeline should only be called with keyword arguments."
+        
+        # Verify the keyword arguments match the defaults
+        expected_kwargs = {
             'output_dir': './output',
             'temp_dir': None,
             'n_samples': 5,  # default
@@ -43,7 +48,8 @@ class TestGeneInsightCLI:
             'api_base_url': None,
             'target_filtered_topics': 25,
             'species': 9606
-        }, "Pipeline got unexpected init args."
+        }
+        assert call_kwargs == expected_kwargs, "Pipeline got unexpected init kwargs."
 
         # Check run() call
         mock_pipeline_instance = mock_pipeline.return_value
@@ -81,10 +87,15 @@ class TestGeneInsightCLI:
             main()
 
         mock_pipeline.assert_called_once()
-        pipeline_init_args, _ = mock_pipeline.call_args
+        
+        # Unpack the Pipeline call
+        call_args, call_kwargs = mock_pipeline.call_args
+        
+        # Ensure no positional arguments
+        assert call_args == (), "Pipeline should only be called with keyword arguments."
 
-        # Unpack the single dict argument passed to Pipeline
-        assert pipeline_init_args[0] == {
+        # Check the keyword arguments
+        expected_kwargs = {
             'output_dir': 'my_output',
             'temp_dir': 'my_temp_dir',
             'n_samples': 10,
@@ -96,7 +107,10 @@ class TestGeneInsightCLI:
             'api_base_url': 'https://example.com/api',
             'target_filtered_topics': 30,
             'species': 10090
-        }, "Pipeline got unexpected init args when passing all CLI parameters."
+        }
+        assert call_kwargs == expected_kwargs, (
+            "Pipeline got unexpected init kwargs when passing all CLI parameters."
+        )
 
         # Ensure run() is called correctly
         mock_pipeline_instance = mock_pipeline.return_value

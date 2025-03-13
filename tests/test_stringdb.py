@@ -144,10 +144,11 @@ def test_query_string_db_individual_genes_error_handling(
     Ensures the bad gene is logged, partial DataFrame is returned, and coverage for error branch.
     """
     # Suppose "GeneB" triggers an exception
-    def side_effect_get_string_ids(gene):
-        if gene == ["GeneB"]:
+    def side_effect_get_string_ids(gene_list, species=9606):
+        # Check if this is the problematic gene
+        if gene_list == ["GeneB"]:
             raise ValueError("Test Exception for GeneB")
-        return pd.DataFrame({"queryItem": [f"ID-{gene[0]}"]})
+        return pd.DataFrame({"queryItem": [f"ID-{gene_list[0]}"]})
 
     mock_get_string_ids.side_effect = side_effect_get_string_ids
     mock_get_enrichment.return_value = pd.DataFrame({"description": ["TermX"]})

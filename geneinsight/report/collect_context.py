@@ -81,12 +81,20 @@ def call_api(
     max_retries: int = 10
 ) -> str:
     """
-    Generic API caller that uses instructor's typed validation for OpenAI.
+    Generic API caller that supports both OpenAI and Ollama.
     """
     try:
-        # Always use OpenAI in this implementation
-        openai_client = OpenAI(api_key=api_key)
-        client = instructor.from_openai(openai_client)
+        # Choose client based on the service parameter
+        if service.lower() == "openai":
+            openai_client = OpenAI(api_key=api_key)
+            client = instructor.from_openai(openai_client, mode=instructor.Mode.TOOLS)
+        elif service.lower() == "ollama":
+            # For Ollama, if no API key is provided, fallback to "ollama"
+            ollama_client = OpenAI(api_key=api_key or "ollama", base_url=base_url)
+            client = instructor.from_openai(ollama_client, mode=instructor.Mode.TOOLS)
+        else:
+            raise ValueError(f"Unsupported service: {service}")
+        
         resp = client.chat.completions.create(
             model=model,
             messages=messages,
@@ -97,6 +105,7 @@ def call_api(
     except Exception as e:
         logging.error(f"API call failed: {e}")
         return ""
+
 
 # ------------------------------
 # Wrapper Functions for API Calls
@@ -322,7 +331,7 @@ if __name__ == "__main__":
     parser.add_argument("--service", type=str, default="openai", help="Service to use (only openai is supported).")
     parser.add_argument("--model", type=str, default="gpt-4o-mini", help="Model to use for generation.")
     parser.add_argument("--base_url", type=str, default=None, help="Optional base URL for API calls.")
-    parser.add_argument("--n_jobs", type=int, default=10, help="Number of parallel workers.")
+    parser.add_argument("--n_jobs", type=int, default=1, help="Number of parallel workers.")
     args = parser.parse_args()
     
     generate_context(

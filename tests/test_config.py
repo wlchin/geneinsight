@@ -3,6 +3,7 @@ import json
 import yaml
 import pytest
 from unittest.mock import patch, mock_open
+import logging
 
 # Import the module directly - assuming the file structure is:
 # geneinsight/
@@ -189,10 +190,12 @@ def test_save_config_yaml(tmp_path, sample_config):
 
 def test_save_config_unsupported_format(sample_config, caplog):
     """Test saving to unsupported file format."""
-    # Based on the error log, the function logs an error instead of raising an exception
-    save_config(sample_config, "config.txt")
+    # Make sure we capture ERROR level logs
+    with caplog.at_level(logging.ERROR):
+        save_config(sample_config, "config.txt")
+    
+    # Check if the expected error message is in the captured logs
     assert "Error saving configuration: Unsupported configuration file format: .txt" in caplog.text
-
 
 def test_get_config_default():
     """Test getting default configuration."""

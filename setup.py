@@ -11,7 +11,7 @@ DESCRIPTION = 'Topic modeling pipeline for gene sets with enrichment analysis'
 URL = 'https://github.com/wlchin/geneinsight'
 EMAIL = 'wee.chin@health.wa.gov.au'
 AUTHOR = 'WL Chin'
-REQUIRES_PYTHON = '>=3.9'
+REQUIRES_PYTHON = '>=3.9,=<3.10'
 VERSION = '0.1.0'
 
 # Core required packages
@@ -101,7 +101,7 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
-        'Topic :: Scientific/Engineering :: Bio-Informatics',
+        'Topic :: Scientific/Engineering :: Bioinformatics',
     ],
     entry_points={
         'console_scripts': [

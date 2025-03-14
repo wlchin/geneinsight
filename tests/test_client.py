@@ -101,6 +101,10 @@ def test_fetch_subtopic_heading_api_call_success(monkeypatch, service):
     """
     monkeypatch.setattr("geneinsight.api.client.APIS_AVAILABLE", True)
 
+    # Mock the OpenAI client constructor
+    mock_openai_client = MagicMock()
+    monkeypatch.setattr("geneinsight.api.client.OpenAI", mock_openai_client)
+
     # Mock the from_openai function to return a mock object
     mock_client = MagicMock()
     # We'll simulate a response having a 'topic' field
@@ -113,15 +117,21 @@ def test_fetch_subtopic_heading_api_call_success(monkeypatch, service):
 
     monkeypatch.setattr("geneinsight.api.client.instructor.from_openai", mock_from_openai)
 
+    # Set environment variables for API keys
     if service == "openai":
         monkeypatch.setenv("OPENAI_API_KEY", "test_openai_key")
     elif service == "together":
         monkeypatch.setenv("TOGETHER_API_KEY", "test_together_key")
+    elif service == "ollama":
+        # For ollama, we still need to make sure an api_key is available
+        monkeypatch.setenv("OPENAI_API_KEY", "test_openai_key")
 
     result = fetch_subtopic_heading(
         user_prompt="some user prompt",
         system_prompt="some system prompt",
-        service=service
+        service=service,
+        # Explicitly provide an API key to avoid relying on env variables in test
+        api_key="test_key_for_all_services"
     )
     assert result == "MOCK_TOPIC"
     mock_client.chat.completions.create.assert_called_once()
@@ -376,3 +386,5 @@ def test_no_dotenv_file_found(monkeypatch, caplog):
 
     # Reload again to restore normal state after test
     importlib.reload(gi_client)
+
+

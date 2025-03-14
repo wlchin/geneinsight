@@ -11,10 +11,20 @@ DESCRIPTION = 'Topic modeling pipeline for gene sets with enrichment analysis'
 URL = 'https://github.com/wlchin/geneinsight'
 EMAIL = 'wee.chin@health.wa.gov.au'
 AUTHOR = 'WL Chin'
-REQUIRES_PYTHON = '>=3.9,<3.10'
+REQUIRES_PYTHON = '>=3.9, <3.10'
 VERSION = '0.1.0'
 
-# Core required packages
+# Visualization and reporting packages
+REPORT_PACKAGES = [
+    'umap-learn>=0.5.0',
+    'plotly>=5.9.0',
+    'sphinx>=4.3.0',
+    'pillow>=9.0.0',
+    'sphinx-wagtail-theme>=6.5.0',
+    'sphinx-togglebutton>=0.3.2',
+]
+
+# Core required packages - now includes both ollama and all report packages
 REQUIRED = [
     'pandas>=2.0.0',
     'bertopic>=0.15.0',
@@ -35,10 +45,8 @@ REQUIRED = [
     'seaborn>=0.12.0',
     'colorcet>=3.0.0',  # Updated to match requirements.txt version
     'torch>=1.7.0',     # Needed for sentence-transformers in ontology module
-]
-
-# Visualization and reporting packages
-REPORT_PACKAGES = [
+    'ollama==0.4.7',    # Added ollama as a required dependency with specific version
+    # Report packages added as required dependencies
     'umap-learn>=0.5.0',
     'plotly>=5.9.0',
     'sphinx>=4.3.0',
@@ -55,9 +63,9 @@ EXTRAS = {
         'isort>=5.12.0',
         'flake8>=6.0.0',
     ],
-    'report': REPORT_PACKAGES,
-    'ollama': ['ollama>=0.28.1'],
-    'all': ['ollama>=0.28.1'] + REPORT_PACKAGES,
+    'report': REPORT_PACKAGES,  # Kept for backwards compatibility
+    'ollama': ['ollama==0.4.7'],  # Kept for backwards compatibility
+    'all': ['ollama==0.4.7'] + REPORT_PACKAGES,  # Kept for backwards compatibility
 }
 
 # The rest of the setup code

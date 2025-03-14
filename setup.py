@@ -11,7 +11,7 @@ DESCRIPTION = 'Topic modeling pipeline for gene sets with enrichment analysis'
 URL = 'https://github.com/wlchin/geneinsight'
 EMAIL = 'wee.chin@health.wa.gov.au'
 AUTHOR = 'WL Chin'
-REQUIRES_PYTHON = '>=3.9, <3.10'
+REQUIRES_PYTHON = '>=3.9, <=3.10'
 VERSION = '0.1.0'
 
 # Visualization and reporting packages

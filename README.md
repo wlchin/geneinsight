@@ -20,17 +20,26 @@ Geneinsight provides a comprehensive pipeline for analyzing gene sets through to
 
 ## Installation
 
-Requires Python 3.9 or higher.
+Requires Python 3.9 or 3.10.
 
 ```bash
 
 # Install directly from GitHub
-pip install git+https://github.com/yourusername/geneinsight.git
+pip install git+https://github.com/wlchin/geneinsight.git
+
+# Or with UV (faster installation)
+uv pip install git+https://github.com/wlchin/geneinsight.git
 
 # Clone the repository and install in development mode
-git clone https://github.com/yourusername/geneinsight.git
+git clone https://github.com/wlchin/geneinsight.git
 cd geneinsight
 pip install -e .
+
+# Or with UV for development mode
+git clone https://github.com/wlchin/geneinsight.git
+cd geneinsight
+uv pip install -e .
+
 ```
 
 ## Quick Start
@@ -68,7 +77,7 @@ usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
                    [--species SPECIES] [-v {none,debug,info,warning,error,critical}]
                    query_gene_set background_gene_list
 
-Gene Insight CLI - run the TopicGenes pipeline with a given query set and background.
+Gene Insight CLI - run the GeneInsight pipeline with a given query set and background.
 
 positional arguments:
   query_gene_set        Path to file containing the query gene set.
@@ -82,7 +91,7 @@ options:
   --n_samples N_SAMPLES
                         Number of topic models to run with different seeds (default 5).
   --num_topics NUM_TOPICS
-                        Number of topics to extract in topic modeling (default None).
+                        Number of topics to extract in topic modeling (default None (automatic)).
   --pvalue_threshold PVALUE_THRESHOLD
                         Adjusted P-value threshold for filtering results (default 0.05).
   --api_service API_SERVICE

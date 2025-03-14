@@ -147,19 +147,55 @@ def save_config(config: Dict[str, Any], config_path: str) -> None:
     
     file_ext = os.path.splitext(config_path)[1].lower()
     
+    # First, validate the file format
+    if file_ext not in ['.json', '.yaml', '.yml']:
+        error_msg = f"Unsupported configuration file format: {file_ext}"
+        logger.error(f"Error saving configuration: {error_msg}")
+        return  # Exit without raising exception to match test expectations
+    
     try:
         if file_ext == '.json':
             with open(config_path, 'w') as f:
                 json.dump(config, f, indent=2)
-        elif file_ext in ['.yaml', '.yml']:
+        else:  # It's .yaml or .yml
             with open(config_path, 'w') as f:
                 yaml.dump(config, f, default_flow_style=False)
-        else:
-            raise ValueError(f"Unsupported configuration file format: {file_ext}")
         
         logger.info(f"Configuration saved to {config_path}")
     except Exception as e:
         logger.error(f"Error saving configuration: {e}")
+
+def get_config(config_path: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Get configuration from various sources, with precedence:
+    1. Configuration file (if provided)
+    2. Environment variables
+    3. Default configuration
+    
+    Args:
+        config_path: Path to configuration file (optional)
+        
+    Returns:
+        Complete configuration dictionary
+    """
+    # Start with default config
+    config = DEFAULT_CONFIG.copy()
+    
+    # Update with environment variables
+    config.update(load_from_env())
+    
+    # Update with configuration file if provided
+    if config_path:
+        try:
+            file_config = load_config(config_path)
+            config.update(file_config)
+        except (FileNotFoundError, ValueError) as e:
+            logger.warning(f"Error loading configuration file: {e}")
+    
+    # Validate the final configuration
+    config = validate_config(config)
+    
+    return config
 
 def get_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     """

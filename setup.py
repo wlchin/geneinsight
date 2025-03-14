@@ -11,12 +11,12 @@ DESCRIPTION = 'Topic modeling pipeline for gene sets with enrichment analysis'
 URL = 'https://github.com/wlchin/geneinsight'
 EMAIL = 'wee.chin@health.wa.gov.au'
 AUTHOR = 'WL Chin'
-REQUIRES_PYTHON = '>=3.9, <3.11'
+REQUIRES_PYTHON = '>=3.9, <=3.12'
 VERSION = '0.1.0'
 
 # Visualization and reporting packages
 REPORT_PACKAGES = [
-    'umap-learn>=0.5.0',
+    'umap-learn>=0.5.7',
     'plotly>=5.9.0',
     'sphinx>=4.3.0',
     'pillow>=9.0.0',
@@ -47,12 +47,14 @@ REQUIRED = [
     'torch>=1.7.0',     # Needed for sentence-transformers in ontology module
     'ollama==0.4.7',    # Added ollama as a required dependency with specific version
     # Report packages added as required dependencies
-    'umap-learn>=0.5.0',
+    'umap-learn>=0.5.7',
     'plotly>=5.9.0',
     'sphinx>=4.3.0',
     'pillow>=9.0.0',
     'sphinx-wagtail-theme>=6.5.0',
     'sphinx-togglebutton>=0.3.2',
+    'urllib3==1.26.15',
+    'numba==0.61.0'
 ]
 
 # Additional packages

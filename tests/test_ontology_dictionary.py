@@ -79,6 +79,7 @@ def test_empty_and_nan_values(caplog):
     """
     Test that empty or 'NaN' / 'None' strings or lists produce empty dictionaries.
     """
+    caplog.set_level(logging.WARNING)
     df = pd.DataFrame({
         "query": ["q_nan", "q_none", "q_nanstring", "q_listempty", "q_bracketempty"],
         "enrichr_df_filtered": [
@@ -162,6 +163,7 @@ def test_corrupted_json_string(caplog):
     """
     Test that a corrupted JSON string logs an error and yields an empty dict.
     """
+    caplog.set_level(logging.WARNING)
     df = pd.DataFrame({
         "query": ["q_corrupt"],
         "enrichr_df_filtered": [
@@ -344,6 +346,7 @@ def test_column_missing_from_input(caplog):
     """
     Test handling of a missing required column in the input DataFrame.
     """
+    caplog.set_level(logging.WARNING)
     # Missing 'query' column
     df = pd.DataFrame({
         "not_query": ["q1"],

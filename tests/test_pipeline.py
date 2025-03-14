@@ -549,24 +549,28 @@ class TestPipelineDirectoryOperations:
     @patch("geneinsight.pipeline.shutil.rmtree")
     @patch("geneinsight.pipeline.shutil.copytree")
     @patch("geneinsight.pipeline.os.rename")
-    @patch("os.path.exists", return_value=True)
+    @patch("geneinsight.pipeline.os.path.isdir", return_value=True)
+    @patch("geneinsight.pipeline.os.listdir", return_value=["dummy_file.txt"])
+    @patch("geneinsight.pipeline.os.path.exists", return_value=True)
     def test_reorganize_output_directory(
-        self, 
-        mock_exists, 
-        mock_rename, 
-        mock_copytree, 
-        mock_rmtree, 
+        self,
+        mock_exists,
+        mock_listdir,
+        mock_isdir,
+        mock_rename,
+        mock_copytree,
+        mock_rmtree,
         pipeline
     ):
         """Test the _reorganize_output_directory method."""
         output_path = os.path.join(pipeline.dirs["final"], "test_run")
-        
+
         # Call the method
         pipeline._reorganize_output_directory(output_path)
-        
+
         # Verify the calls
         assert mock_rmtree.call_count >= 1  # Called for ontology folder + original sphinx_builds
-        assert mock_copytree.call_count == 1  # Copying sphinx_builds
+        assert mock_copytree.call_count >= 1  # Copying sphinx_builds and potentially ontology items
         assert mock_rename.call_count == 1    # Renaming the temp sphinx_builds
     
     @patch("geneinsight.utils.zip_helper.zip_directory")

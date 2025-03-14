@@ -35,7 +35,7 @@ def topics_df():
 def mock_embedder():
     """Create a mock SentenceTransformer object."""
     embedder = MagicMock()
-    embedder.encode.side_effect = lambda texts, convert_to_tensor=False: torch.rand(
+    embedder.encode.side_effect = lambda texts, convert_to_tensor=False, **kwargs: torch.rand(
         (len(texts) if isinstance(texts, list) else 1, 10)
     )
     return embedder

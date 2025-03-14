@@ -48,6 +48,7 @@ def setup_test_files():
         "topics.csv": pd.DataFrame({"Topic": ["topic1", "topic2"], "Genes": ["gene1", "gene2"]}),
         "enrichment.csv": pd.DataFrame({"Term": ["term1", "term2"], "P-value": [0.01, 0.02]}),
         "ontology_dict.csv": pd.DataFrame({"query": ["query1"], "ontology_dict": ["{'GO:1': 'GENE1'}"]}),
+        "enriched.csv": pd.DataFrame({"Term": ["term1", "term2"], "Odds Ratio": [1.5, 2.0], "P-value": [0.01, 0.02], "Adjusted P-value": [0.01, 0.02], "Combined Score": [1.5, 2.0]}),
     }
     
     # Create input files

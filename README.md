@@ -94,7 +94,7 @@ geneinsight query_genes.txt background_genes.txt \
 ```
 usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
                    [--num_topics NUM_TOPICS] [--pvalue_threshold PVALUE_THRESHOLD]
-                   [--api_service API_SERVICE] [--api_model API_MODEL]
+                   [--api_service API_SERVICE] [--api_model API_MODEL] [--api_temperature API_TEMPERATURE]
                    [--api_parallel_jobs API_PARALLEL_JOBS] [--api_base_url API_BASE_URL]
                    [--target_filtered_topics TARGET_FILTERED_TOPICS] [--temp_dir TEMP_DIR]
                    [--report_title REPORT_TITLE] [--species SPECIES]

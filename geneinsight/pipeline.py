@@ -159,13 +159,13 @@ class Pipeline:
             self.console.print("[bold green]Done! Step 5 completed.[/bold green]")
 
             # Step 6: Hypergeometric enrichment
-            self.console.rule("[bold cyan]Step 6: Performing gene set enrichment[/bold cyan]")
-            self.console.print("Performing enrichment analysis to detect enriched gene sets")
             enriched_df = self._perform_hypergeometric_enrichment(
                 summary_df, query_gene_set, background_gene_list
             )
+            if enriched_df.empty:
+                logger.error("Hypergeometric enrichment resulted in an empty DataFrame")
+                raise ValueError("Hypergeometric enrichment resulted in an empty DataFrame")
             self.console.print(f"Number of enriched gene sets: {len(enriched_df)}")
-            self.console.print("[bold green]Done! Step 6 completed.[/bold green]")
 
             # Step 7: Topic modeling on filtered gene sets (meta-analysis)
             self.console.rule("[bold cyan]Step 7: Running topic modeling on filtered gene sets[/bold cyan]")
@@ -481,6 +481,12 @@ class Pipeline:
     def _filter_topics(self, input_df: pd.DataFrame) -> pd.DataFrame:
         """Filter topics by similarity."""
         from .analysis.similarity import filter_terms_by_similarity
+        
+        # Check if input DataFrame is empty
+        if input_df.empty:
+            logger.error("Cannot filter topics: input DataFrame is empty")
+            raise ValueError("Cannot filter topics: input DataFrame is empty")
+            
         key_topics_file = os.path.join(self.dirs["key_topics"], "key_topics.csv")
         input_df.to_csv(key_topics_file, index=False)
         filtered_output = os.path.join(self.dirs["filtered_sets"], "filtered.csv")

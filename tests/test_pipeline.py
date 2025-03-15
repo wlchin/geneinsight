@@ -724,15 +724,19 @@ class TestPipelineRun:
         Test that run() raises a ValueError when _perform_hypergeometric_enrichment returns an empty DataFrame.
         """
         empty_df = pd.DataFrame()
+        
         with patch.object(pipeline, '_get_stringdb_enrichment', return_value=(mock_enrichment_df, mock_documents_df)), \
-             patch.object(pipeline, '_run_topic_modeling', return_value=mock_topics_df), \
-             patch.object(pipeline, '_generate_prompts', return_value=mock_prompts_df), \
-             patch.object(pipeline, '_process_api_calls', return_value=mock_api_results_df), \
-             patch.object(pipeline, '_create_summary', return_value=mock_summary_df), \
-             patch.object(pipeline, '_perform_hypergeometric_enrichment', return_value=empty_df):
+            patch.object(pipeline, '_run_topic_modeling', return_value=mock_topics_df), \
+            patch.object(pipeline, '_generate_prompts', return_value=mock_prompts_df), \
+            patch.object(pipeline, '_process_api_calls', return_value=mock_api_results_df), \
+            patch.object(pipeline, '_create_summary', return_value=mock_summary_df), \
+            patch.object(pipeline, '_perform_hypergeometric_enrichment', return_value=empty_df):
             
             with pytest.raises(ValueError, match="Hypergeometric enrichment resulted in an empty DataFrame"):
-                pipeline.run(query_gene_set=mock_files["query"], background_gene_list=mock_files["background"])
+                pipeline.run(
+                    query_gene_set=mock_files["query"], 
+                    background_gene_list=mock_files["background"]
+                )
 
     def test_run_report_fail(self, pipeline, mock_files, mock_enrichment_df, mock_documents_df,
                              mock_topics_df, mock_prompts_df, mock_api_results_df, mock_summary_df,

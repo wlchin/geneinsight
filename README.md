@@ -2,7 +2,7 @@
 
 ![MIT License](https://img.shields.io/badge/license-MIT-blue)
 ![Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen)
-![Python 3.10+](https://img.shields.io/badge/python-3.9%2B-blue)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 
 A Python package for topic modeling of gene sets with enrichment analysis. 
 

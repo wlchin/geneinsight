@@ -43,7 +43,9 @@ def main():
                         help="Title for the generated report.")
     parser.add_argument("--species", type=int, default=9606,
                         help="Species identifier (default: 9606 for human).")
-
+    # New argument for controlling number of topic models on filtered sets
+    parser.add_argument("--filtered_n_samples", type=int, default=10,
+                        help="Number of topic models to run on filtered sets (default 10).")
     # New argument for controlling verbosity
     parser.add_argument("-v", "--verbosity",
                         default="none",
@@ -82,7 +84,8 @@ def main():
         api_parallel_jobs=args.api_parallel_jobs,
         api_base_url=args.api_base_url,
         target_filtered_topics=args.target_filtered_topics,
-        species=args.species
+        species=args.species,
+        filtered_n_samples=args.filtered_n_samples  # new parameter passed to Pipeline
     )
 
     pipeline.run(

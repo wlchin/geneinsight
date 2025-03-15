@@ -20,7 +20,7 @@ Geneinsight provides a comprehensive pipeline for analyzing gene sets through to
 
 ## Installation
 
-Requires Python 3.9+.
+Requires Python 3.10+.
 
 ### Quick Installation
 

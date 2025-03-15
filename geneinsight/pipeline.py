@@ -148,7 +148,7 @@ class Pipeline:
 
             # Step 4: API processing
             self.console.rule("[bold cyan]Step 4: Processing prompts through API[/bold cyan]")
-            self.console.print(f"[bold]Using API: {self.api_service} with {self.api_parallel_jobs} parallel jobs[/bold]")
+            self.console.print(f"[bold]Using API: {self.api_service} with {self.api_parallel_jobs} parallel jobs and temperature: {self.api_temperature}[/bold]")
             api_results_df = self._process_api_calls(prompts_df)
             self.console.print("[bold green]Done! Step 4 completed.[/bold green]")
 
@@ -169,6 +169,7 @@ class Pipeline:
 
             # Step 7: Topic modeling on filtered gene sets (meta-analysis)
             self.console.rule("[bold cyan]Step 7: Running topic modeling on filtered gene sets[/bold cyan]")
+            self.console.print(f"Running topic modeling on filtered gene sets using {self.filtered_n_samples} samples")
             topics_df = self._run_topic_modeling_on_filtered_sets(enriched_df)
             self.console.print("[bold green]Done! Step 7 completed.[/bold green]")
 

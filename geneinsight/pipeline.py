@@ -30,7 +30,8 @@ class Pipeline:
         api_parallel_jobs: int = 4,
         api_base_url: Optional[str] = None,
         target_filtered_topics: int = 25,
-        species: int = 9606
+        species: int = 9606,
+        filtered_n_samples: int = 10  # new parameter for filtered sets topic modeling
     ):
         self.output_dir = os.path.abspath(output_dir)
 
@@ -54,6 +55,7 @@ class Pipeline:
         self.api_base_url = api_base_url
         self.target_filtered_topics = target_filtered_topics
         self.species = species  # Save species as an instance variable
+        self.filtered_n_samples = filtered_n_samples  # store new parameter
 
         # Create directories
         os.makedirs(self.output_dir, exist_ok=True)
@@ -453,7 +455,7 @@ class Pipeline:
             output_file=resampled_output,
             method="bertopic",
             num_topics=None,  # Auto-determine
-            n_samples=10
+            n_samples=self.filtered_n_samples
         )
         return topics_df
 
@@ -605,6 +607,7 @@ if __name__ == "__main__":
     parser.add_argument("--target_filtered_topics", type=int, default=25, help="Target number of topics.")
     parser.add_argument("--temp_dir", type=str, default=None, help="Temporary directory for intermediate files.")
     parser.add_argument("--report_title", type=str, default=None, help="Title for the generated report.")
+    parser.add_argument("--filtered_n_samples", type=int, default=10, help="Number of topic models to run on filtered sets.")
     parser.add_argument("-v", "--verbosity",
                         default="info",
                         choices=["none", "debug", "info", "warning", "error", "critical"],
@@ -638,7 +641,8 @@ if __name__ == "__main__":
         api_parallel_jobs=args.api_parallel_jobs,
         api_base_url=args.api_base_url,
         target_filtered_topics=args.target_filtered_topics,
-        species=args.species
+        species=args.species,
+        filtered_n_samples=args.filtered_n_samples
     )
 
     pipeline.run(

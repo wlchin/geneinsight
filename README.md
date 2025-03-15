@@ -109,7 +109,7 @@ usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
 | `-o`, `--output_dir` | Directory to store final outputs | ./output |
 | `--no-report` | Skip generating an HTML report | False |
 | `--n_samples` | Number of topic models to run with different seeds | 5 |
-| `--filtered_n_samples` | Number of topic models to sample from filtered (enriched) gene sets | 10 |
+| `--filtered_n_samples` | Number of topic models to run from filtered (enriched) gene sets | 10 |
 | `--num_topics` | Number of topics to extract in topic modeling | None (auto) |
 | `--pvalue_threshold` | Adjusted P-value threshold for filtering results | 0.05 |
 | `--api_service` | API service for topic refinement | openai |

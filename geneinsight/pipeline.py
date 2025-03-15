@@ -121,30 +121,38 @@ class Pipeline:
             logger.error("No common items between query gene set and background. Aborting pipeline.")
             raise ValueError("No overlap found between query gene set and background. Pipeline aborted.")
         else:
-            logger.info(f"Found {len(overlap)} overlapping genes between query and background.")
+            self.console.print(f"Found {len(overlap)} overlapping genes between query and background.")
+            # New console print for Step 1 info
+            self.console.print(f"[bold]Step 1 Info:[/bold] Query gene set length: {len(query_genes)}, Background gene set length: {len(background_genes)}, Species: {self.species}")
         try:
             # Step 1: Gene enrichment from StringDB
             self.console.rule("[bold cyan]Step 1: Retrieving gene enrichment data from StringDB[/bold cyan]")
             enrichment_df, documents_df = self._get_stringdb_enrichment(query_gene_set)
+            self.console.print("[bold green]Done! Step 1 completed.[/bold green]")
 
             # Step 2: Topic modeling
             self.console.rule("[bold cyan]Step 2: Running topic modeling[/bold cyan]")
-            self.console.print(f"Running topic modeling with {self.n_samples} samples")
+            self.console.print(f"Running topic modeling with {self.n_samples} rounds of sampling on {len(documents_df)} STRING-DB terms")
             topics_df = self._run_topic_modeling(documents_df)
+            self.console.print("[bold green]Done! Step 2 completed.[/bold green]")
 
             # Step 3: Prompt generation
             self.console.rule("[bold cyan]Step 3: Generating prompts for topic refinement[/bold cyan]")
             self.console.print("Generating prompts for API calls")
             prompts_df = self._generate_prompts(topics_df)
+            self.console.print("[bold green]Done! Step 3 completed.[/bold green]")
 
             # Step 4: API processing
             self.console.rule("[bold cyan]Step 4: Processing prompts through API[/bold cyan]")
+            self.console.print(f"[bold]Using API: {self.api_service} with {self.api_parallel_jobs} parallel jobs[/bold]")
             api_results_df = self._process_api_calls(prompts_df)
+            self.console.print("[bold green]Done! Step 4 completed.[/bold green]")
 
             # Step 5: Create summary
             self.console.rule("[bold cyan]Step 5: Creating summary[/bold cyan]")
             self.console.print("Creating summary by combining API results with enrichment data")
             summary_df = self._create_summary(api_results_df, enrichment_df)
+            self.console.print("[bold green]Done! Step 5 completed.[/bold green]")
 
             # Step 6: Hypergeometric enrichment
             self.console.rule("[bold cyan]Step 6: Performing gene set enrichment[/bold cyan]")
@@ -152,23 +160,27 @@ class Pipeline:
             enriched_df = self._perform_hypergeometric_enrichment(
                 summary_df, query_gene_set, background_gene_list
             )
-
-            if enriched_df.empty:
-                logger.error("No results from hypergeometric enrichment. Aborting pipeline.")
-                raise ValueError("Hypergeometric enrichment resulted in an empty DataFrame. Pipeline aborted.")
+            self.console.print(f"Number of enriched gene sets: {len(enriched_df)}")
+            self.console.print("[bold green]Done! Step 6 completed.[/bold green]")
 
             # Step 7: Topic modeling on filtered gene sets (meta-analysis)
             self.console.rule("[bold cyan]Step 7: Running topic modeling on filtered gene sets[/bold cyan]")
-            self.console.print("Detecting key topics (centroids) from the enriched gene sets")
             topics_df = self._run_topic_modeling_on_filtered_sets(enriched_df)
+            self.console.print("[bold green]Done! Step 7 completed.[/bold green]")
 
             # Step 8: Extract key topics
             self.console.rule("[bold cyan]Step 8: Extracting key topics[/bold cyan]")
+            self.console.print("Detecting key topics (centroids) from the enriched gene sets")
             key_topics_df = self._get_key_topics(topics_df)
+            self.console.print("[bold green]Done! Step 8 completed.[/bold green]")
 
             # Step 9: Filter topics by similarity
             self.console.rule("[bold cyan]Step 9: Filtering topics by similarity[/bold cyan]")
+            self.console.print("Filtering topics for report generation")
+            self.console.print("Number of key topics before filtering: ", len(key_topics_df))
             filtered_df = self._filter_topics(key_topics_df)
+            self.console.print(f"Number of topics filtered for report: {len(filtered_df)}")
+            self.console.print("[bold green]Done! Step 9 completed.[/bold green]")
 
             if len(filtered_df) < self.target_filtered_topics:
                 logger.info("Filtered topics fewer than target; using entire enriched dataframe for filtering and clustering.")
@@ -178,18 +190,22 @@ class Pipeline:
             self.console.rule("[bold cyan]Step 9b: Clustering filtered topics[/bold cyan]")
             self.console.print("Creating hierarchical summaries")
             clustered_df = self._run_clustering(filtered_df)
+            self.console.print("[bold green]Done! Step 9b completed.[/bold green]")
 
             # Step 9c: Ontology enrichment analysis
             self.console.rule("[bold cyan]Step 9c: Performing ontology enrichment analysis[/bold cyan]")
+            self.console.print("Running ontology enrichment analysis against GO and HPO ontologies")
             ontology_dict_df = self._perform_ontology_enrichment(
                 summary_df=summary_df,
                 clustered_df=clustered_df,
                 query_gene_set=query_gene_set,
                 background_gene_list=background_gene_list
             )
+            self.console.print("[bold green]Done! Step 9c completed.[/bold green]")
 
             # Step 10: Finalize outputs
             self.console.rule("[bold cyan]Step 10: Finalizing outputs[/bold cyan]")
+            self.console.print("Generating report metadata and checking output files ...")
             output_path = self._finalize_outputs(
                 run_id,
                 {
@@ -205,6 +221,7 @@ class Pipeline:
                     "ontology_dict": ontology_dict_df,
                 }
             )
+            self.console.print("[bold green]Done! Step 10 completed.[/bold green]")
 
             # Step 11: Generate report (if requested)
             if generate_report:
@@ -218,13 +235,17 @@ class Pipeline:
                     logger.info(f"Report generated successfully at {report_output}")
                 else:
                     logger.warning("Report generation failed or was skipped")
+                self.console.print("[bold green]Done! Step 11 completed.[/bold green]")
 
             # Step 12: Reorganize output directory
             self.console.rule("[bold cyan]Step 12: Reorganizing output directory[/bold cyan]")
             if os.path.isdir(output_path):
                 self._reorganize_output_directory(output_path)
+            self.console.print("[bold green]Done! Step 12 completed.[/bold green]")
 
             self.console.print("[bold green]Pipeline completed successfully![/bold green]")
+            self.console.print(f"Results available at: [bold]{output_path + '.zip'}[/bold]")
+            self.console.print(f"Report available at: [bold]{self.dirs['sphinx_builds']+ '.zip'}[/bold]")
             logger.info(f"Pipeline completed successfully. Results available at: {self.dirs['final']}")
             return self.dirs["final"]
 

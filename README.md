@@ -95,30 +95,32 @@ usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
                    [--num_topics NUM_TOPICS] [--pvalue_threshold PVALUE_THRESHOLD]
                    [--api_service API_SERVICE] [--api_model API_MODEL]
                    [--api_parallel_jobs API_PARALLEL_JOBS] [--api_base_url API_BASE_URL]
-                   [--target_filtered_topics TARGET_FILTERED_TOPICS]
-                   [--temp_dir TEMP_DIR] [--report_title REPORT_TITLE]
-                   [--species SPECIES] [-v {none,debug,info,warning,error,critical}]
+                   [--target_filtered_topics TARGET_FILTERED_TOPICS] [--temp_dir TEMP_DIR]
+                   [--report_title REPORT_TITLE] [--species SPECIES]
+                   [--filtered_n_samples FILTERED_N_SAMPLES]
+                   [-v {none,debug,info,warning,error,critical}]
                    query_gene_set background_gene_list
 ```
 
-| Option | Description |
-|--------|-------------|
-| `query_gene_set` | Path to file containing the query gene set |
-| `background_gene_list` | Path to file containing the background gene list |
-| `-o, --output_dir` | Directory to store outputs (default: './output') |
-| `--no-report` | Skip generating an HTML report |
-| `--n_samples` | Number of topic models to run (default: 5) |
-| `--num_topics` | Number of topics to extract (default: automatic) |
-| `--pvalue_threshold` | Adjusted P-value threshold (default: 0.05) |
-| `--api_service` | API service for refinement (default: 'openai') |
-| `--api_model` | Model name for API service (default: 'gpt-4o-mini') |
-| `--api_parallel_jobs` | Number of parallel API jobs (default: 1) |
-| `--api_base_url` | Base URL for API service (required for Ollama) |
-| `--target_filtered_topics` | Target number of topics after filtering (default: 25) |
-| `--temp_dir` | Temporary directory for intermediate files |
-| `--report_title` | Title for the generated report |
-| `--species` | Species identifier (default: 9606 for human) |
-| `-v, --verbosity` | Set logging verbosity (default: 'none') |
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `query_gene_set` | Path to file containing the query gene set | Required |
+| `background_gene_list` | Path to file containing the background gene list | Required |
+| `-o`, `--output_dir` | Directory to store final outputs | ./output |
+| `--no-report` | Skip generating an HTML report | False |
+| `--n_samples` | Number of topic models to run with different seeds | 5 |
+| `--filtered_n_samples` | Number of topic models to sample from filtered (enriched) gene sets | 10 |
+| `--num_topics` | Number of topics to extract in topic modeling | None (auto) |
+| `--pvalue_threshold` | Adjusted P-value threshold for filtering results | 0.05 |
+| `--api_service` | API service for topic refinement | openai |
+| `--api_model` | Model name for the API service | gpt-4o-mini |
+| `--api_parallel_jobs` | Number of parallel API jobs | 1 |
+| `--api_base_url` | Base URL for the API service | None |
+| `--target_filtered_topics` | Target number of topics after filtering | 25 |
+| `--temp_dir` | Temporary directory for intermediate files | None |
+| `--report_title` | Title for the generated report | None |
+| `--species` | Species identifier (9606 for human) | 9606 |
+| `-v`, `--verbosity` | Set logging verbosity | none |
 
 ## API Support
 

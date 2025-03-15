@@ -11,7 +11,7 @@ DESCRIPTION = 'Topic modeling pipeline for gene sets with enrichment analysis'
 URL = 'https://github.com/wlchin/geneinsight'
 EMAIL = 'wee.chin@health.wa.gov.au'
 AUTHOR = 'WL Chin'
-REQUIRES_PYTHON = '>=3.9, <=3.12'
+REQUIRES_PYTHON = '>=3.10, <=3.12'
 VERSION = '0.1.0'
 
 # Visualization and reporting packages
@@ -64,6 +64,7 @@ EXTRAS = {
         'black>=23.3.0',
         'isort>=5.12.0',
         'flake8>=6.0.0',
+        'pytest-cov>=3.0.0',
     ],
     'report': REPORT_PACKAGES,  # Kept for backwards compatibility
     'ollama': ['ollama==0.4.7'],  # Kept for backwards compatibility

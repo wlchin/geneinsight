@@ -2,7 +2,7 @@
 
 ![MIT License](https://img.shields.io/badge/license-MIT-blue)
 ![Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen)
-![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)
+![Python 3.90+](https://img.shields.io/badge/python-3.9%2B-blue)
 
 A Python package for topic modeling of gene sets with enrichment analysis. 
 
@@ -20,7 +20,7 @@ Geneinsight provides a comprehensive pipeline for analyzing gene sets through to
 
 ## Installation
 
-Requires Python 3.9+.
+Requires Python 3.10+.
 
 ### Quick Installation
 

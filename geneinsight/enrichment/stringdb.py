@@ -85,7 +85,10 @@ def query_string_db_individual_genes(
             )
             # We add 'gene_queried' to the columns below
             enrichment_df["gene_queried"] = gene
-            list_of_df.append(enrichment_df)
+            
+            # Only add non-empty DataFrames to the list
+            if not enrichment_df.empty:
+                list_of_df.append(enrichment_df)
             time.sleep(1)  # Rate limiting
         except KeyboardInterrupt:
             logger.info("Pipeline terminated by user via KeyboardInterrupt.")
@@ -113,7 +116,14 @@ def query_string_db_individual_genes(
     if not list_of_df:
         return pd.DataFrame(columns=["description", "gene_queried"]), []
 
-    total_df = pd.concat(list_of_df, ignore_index=True)
+    # Filter out empty DataFrames before concatenation
+    non_empty_dfs = [df for df in list_of_df if not df.empty]
+    
+    # Check if we have any non-empty DataFrames left
+    if not non_empty_dfs:
+        return pd.DataFrame(columns=["description", "gene_queried"]), []
+        
+    total_df = pd.concat(non_empty_dfs, ignore_index=True)
     documents = total_df["description"].unique().tolist()
     return total_df, documents
 

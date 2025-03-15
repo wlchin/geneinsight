@@ -20,42 +20,51 @@ Geneinsight provides a comprehensive pipeline for analyzing gene sets through to
 
 ## Installation
 
-Requires Python 3.9.
+Requires Python 3.9+.
+
+### Quick Installation
 
 ```bash
-
-# Install directly from GitHub
+# Install directly from GitHub with pip
 pip install git+https://github.com/wlchin/geneinsight.git
 
-# Or with UV (faster installation)
+# OR use UV for faster installation (recommended)
+# Install UV if you don't have it yet: https://github.com/astral-sh/uv
 uv pip install git+https://github.com/wlchin/geneinsight.git
-
-# Clone the repository and install in development mode
-git clone https://github.com/wlchin/geneinsight.git
-cd geneinsight
-pip install -e .
-
-# Or with UV for development mode
-git clone https://github.com/wlchin/geneinsight.git
-cd geneinsight
-uv pip install -e .
-
 ```
 
-### Using UV (recommended)
+### Installation with Virtual Environment (Recommended)
+
+Using a virtual environment is recommended to avoid package conflicts.
+
+#### Using standard pip and venv
 
 ```bash
-# Install UV if you don't have it yet
+# Create a virtual environment
+python -m venv .venv
 
-# Install directly from GitHub with UV
-uv pip install git+https://github.com/wlchin/geneinsight.git
-
-# Or create a Python 3.10 virtual environment and install in development mode (recommended)
-uv venv --python=3.10
+# Activate the virtual environment
 source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
-git clone https://github.com/wlchin/geneinsight.git
-cd geneinsight
-uv pip install .
+
+# Install Geneinsight
+pip install git+https://github.com/wlchin/geneinsight.git
+```
+
+#### Using UV (Faster Alternative)
+
+UV offers faster package resolution and installation:
+
+```bash
+# Install UV if you don't have it yet: https://github.com/astral-sh/uv
+
+# Create a Python 3.10 virtual environment with UV
+uv venv --python=3.10
+
+# Activate the virtual environment
+source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
+
+# Install Geneinsight with UV
+uv pip install git+https://github.com/wlchin/geneinsight.git
 ```
 
 ## Quick Start

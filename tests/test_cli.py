@@ -47,7 +47,9 @@ class TestGeneInsightCLI:
             'api_parallel_jobs': 1,
             'api_base_url': None,
             'target_filtered_topics': 25,
-            'species': 9606
+            'species': 9606,
+            'filtered_n_samples': 10,  # Added new default parameter
+            'api_temperature': 0.2  # Added new default parameter
         }
         assert call_kwargs == expected_kwargs, "Pipeline got unexpected init kwargs."
 
@@ -81,7 +83,9 @@ class TestGeneInsightCLI:
             "--target_filtered_topics", "30",
             "--temp_dir", "my_temp_dir",
             "--report_title", "My Custom Title",
-            "--species", "10090"  # Mouse
+            "--species", "10090",  # Mouse
+            "--filtered_n_samples", "15",
+            "--api_temperature", "0.5"
         ]
         with patch.object(sys, "argv", test_args):
             main()
@@ -106,7 +110,9 @@ class TestGeneInsightCLI:
             'api_parallel_jobs': 25,
             'api_base_url': 'https://example.com/api',
             'target_filtered_topics': 30,
-            'species': 10090
+            'species': 10090,
+            'filtered_n_samples': 15,  # Added new parameter
+            'api_temperature': 0.5  # Added new parameter
         }
         assert call_kwargs == expected_kwargs, (
             "Pipeline got unexpected init kwargs when passing all CLI parameters."
@@ -163,6 +169,28 @@ class TestGeneInsightCLI:
         # Check we tried to run the pipeline
         mock_pipeline.assert_called_once()
         mock_pipeline_instance.run.assert_called_once()
+        
+    @patch("geneinsight.cli.Pipeline")
+    def test_new_parameters(self, mock_pipeline):
+        """
+        Test the new parameters: filtered_n_samples and api_temperature
+        """
+        test_args = [
+            "geneinsight",
+            "query.txt",
+            "background.txt",
+            "--filtered_n_samples", "20",
+            "--api_temperature", "0.7"
+        ]
+        with patch.object(sys, "argv", test_args):
+            main()
+
+        mock_pipeline.assert_called_once()
+        
+        # Check the new parameters were correctly passed
+        call_args, call_kwargs = mock_pipeline.call_args
+        assert call_kwargs['filtered_n_samples'] == 20
+        assert call_kwargs['api_temperature'] == 0.7
 
 if __name__ == "__main__":
     pytest.main(["-v", __file__])

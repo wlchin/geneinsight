@@ -2,7 +2,7 @@
 
 ![MIT License](https://img.shields.io/badge/license-MIT-blue)
 ![Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen)
-![Python 3.90+](https://img.shields.io/badge/python-3.9%2B-blue)
+![Python 3.10+](https://img.shields.io/badge/python-3.9%2B-blue)
 
 A Python package for topic modeling of gene sets with enrichment analysis. 
 
@@ -20,7 +20,7 @@ Geneinsight provides a comprehensive pipeline for analyzing gene sets through to
 
 ## Installation
 
-Requires Python 3.10+.
+Requires Python 3.9+.
 
 ### Quick Installation
 
@@ -67,9 +67,7 @@ source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
 uv pip install git+https://github.com/wlchin/geneinsight.git
 ```
 
-## Quick Start
-
-Run the pipeline on your gene sets:
+## Command Line Interface
 
 ```bash
 # Basic usage
@@ -90,7 +88,7 @@ geneinsight query_genes.txt background_genes.txt \
   --api_base_url "http://localhost:11434/v1"
 ```
 
-## Command Line Interface
+### Available Options
 
 ```
 usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
@@ -101,65 +99,26 @@ usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
                    [--temp_dir TEMP_DIR] [--report_title REPORT_TITLE]
                    [--species SPECIES] [-v {none,debug,info,warning,error,critical}]
                    query_gene_set background_gene_list
-
-Gene Insight CLI - run the GeneInsight pipeline with a given query set and background.
-
-positional arguments:
-  query_gene_set        Path to file containing the query gene set.
-  background_gene_list  Path to file containing the background gene list.
-
-options:
-  -h, --help            show this help message and exit
-  -o OUTPUT_DIR, --output_dir OUTPUT_DIR
-                        Directory to store final outputs. Default: './output'
-  --no-report           Skip generating an HTML report.
-  --n_samples N_SAMPLES
-                        Number of topic models to run with different seeds (default 5).
-  --num_topics NUM_TOPICS
-                        Number of topics to extract in topic modeling (default None (automatic)).
-  --pvalue_threshold PVALUE_THRESHOLD
-                        Adjusted P-value threshold for filtering results (default 0.05).
-  --api_service API_SERVICE
-                        API service for topic refinement (default 'openai', also supports 'ollama').
-  --api_model API_MODEL
-                        Model name for the API service (default 'gpt-4o-mini').
-  --api_parallel_jobs API_PARALLEL_JOBS
-                        Number of parallel API jobs (default 1).
-  --api_base_url API_BASE_URL
-                        Base URL for the API service. Required for Ollama (typically "http://localhost:11434/v1").
-  --target_filtered_topics TARGET_FILTERED_TOPICS
-                        Target number of topics after filtering (default 25).
-  --temp_dir TEMP_DIR   Temporary directory for intermediate files.
-  --report_title REPORT_TITLE
-                        Title for the generated report.
-  --species SPECIES     Species identifier (default: 9606 for human).
-  -v {none,debug,info,warning,error,critical}, --verbosity {none,debug,info,warning,error,critical}
-                        Set logging verbosity. Use 'none' to disable logging. Default is 'none'.
 ```
 
-## Command Line Arguments
-
-The GeneInsight pipeline can be customized with various command line arguments:
-
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `query_gene_set` | Path to file containing the query gene set | Required |
-| `background_gene_list` | Path to file containing the background gene list | Required |
-| `-o`, `--output_dir` | Directory to store final outputs | ./output |
-| `--no-report` | Skip generating an HTML report | False |
-| `--n_samples` | Number of topic models to run with different seeds | 5 |
-| `--filtered_n_samples` | Number of topic models to run on filtered gene sets | 10 |
-| `--num_topics` | Number of topics to extract in topic modeling | None (auto) |
-| `--pvalue_threshold` | Adjusted P-value threshold for filtering results | 0.05 |
-| `--api_service` | API service for topic refinement | openai |
-| `--api_model` | Model name for the API service | gpt-4o-mini |
-| `--api_parallel_jobs` | Number of parallel API jobs | 1 |
-| `--api_base_url` | Base URL for the API service | None |
-| `--target_filtered_topics` | Target number of topics after filtering | 25 |
-| `--temp_dir` | Temporary directory for intermediate files | None |
-| `--report_title` | Title for the generated report | None |
-| `--species` | Species identifier (9606 for human) | 9606 |
-| `-v`, `--verbosity` | Set logging verbosity | none |
+| Option | Description |
+|--------|-------------|
+| `query_gene_set` | Path to file containing the query gene set |
+| `background_gene_list` | Path to file containing the background gene list |
+| `-o, --output_dir` | Directory to store outputs (default: './output') |
+| `--no-report` | Skip generating an HTML report |
+| `--n_samples` | Number of topic models to run (default: 5) |
+| `--num_topics` | Number of topics to extract (default: automatic) |
+| `--pvalue_threshold` | Adjusted P-value threshold (default: 0.05) |
+| `--api_service` | API service for refinement (default: 'openai') |
+| `--api_model` | Model name for API service (default: 'gpt-4o-mini') |
+| `--api_parallel_jobs` | Number of parallel API jobs (default: 1) |
+| `--api_base_url` | Base URL for API service (required for Ollama) |
+| `--target_filtered_topics` | Target number of topics after filtering (default: 25) |
+| `--temp_dir` | Temporary directory for intermediate files |
+| `--report_title` | Title for the generated report |
+| `--species` | Species identifier (default: 9606 for human) |
+| `-v, --verbosity` | Set logging verbosity (default: 'none') |
 
 ## API Support
 
@@ -207,64 +166,6 @@ By default, Geneinsight generates an interactive HTML report visualizing the res
 5. **Download Interface** - Interactive interface to download specific themes
 
 To customize the report, use the `--report_title` parameter.
-
-## Running Individual Steps
-
-Geneinsight provides individual command-line tools for running each step of the pipeline separately:
-
-### 1. StringDB Enrichment
-```bash
-geneinsight-enrichment gene_list.txt -o ./output -m single
-```
-
-### 2. Topic Modeling
-```bash
-geneinsight-topic ./output/gene_list__documents.csv -o ./output/topics.csv -n 5 -k 10
-```
-
-### 3. Prompt Generation
-```bash
-geneinsight-prompt ./output/topics.csv -o ./output/prompts.csv -n 5 -w 10
-```
-
-### 4. API Processing
-```bash
-geneinsight-api ./output/prompts.csv -o ./output/api_results.csv --service openai --model gpt-4o-mini
-```
-
-### 5. Hypergeometric Enrichment
-```bash
-geneinsight-hypergeometric ./output/api_results.csv gene_list.txt background_genes.txt -o ./output/enriched.csv -p 0.05
-```
-
-### 6. Topic Filtering
-```bash
-geneinsight-filter ./output/enriched.csv -o ./output/filtered_topics.csv -t 25
-```
-
-### 7. Report Generation
-```bash
-geneinsight-report ./output -o ./report --title "My Gene Analysis"
-```
-
-This modular approach gives you complete control over the pipeline and allows you to:
-- Experiment with different parameters at each stage
-- Resume processing from any point if a step fails
-- Run only the specific steps you need
-- Integrate individual steps into your own workflows
-
-## Pipeline Configuration
-
-The GeneInsight pipeline uses a two-stage topic modeling approach:
-
-1. Initial topic modeling on the gene enrichment data (`n_samples` parameter)
-2. Secondary topic modeling on filtered gene sets (`filtered_n_samples` parameter)
-
-For optimal results with larger datasets, you may want to increase both parameters. For example:
-
-```bash
-geneinsight query_genes.txt background_genes.txt --n_samples 10 --filtered_n_samples 15
-```
 
 ## License
 

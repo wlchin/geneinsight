@@ -51,6 +51,8 @@ def main():
                         default="none",
                         choices=["none", "debug", "info", "warning", "error", "critical"],
                         help="Set logging verbosity. Use 'none' to disable logging. Default is 'info'.")
+    parser.add_argument("--api_temperature", type=float, default=0.2,
+                        help="Sampling temperature for API calls (default: 0.2).")
 
     args = parser.parse_args()
 
@@ -85,7 +87,8 @@ def main():
         api_base_url=args.api_base_url,
         target_filtered_topics=args.target_filtered_topics,
         species=args.species,
-        filtered_n_samples=args.filtered_n_samples  # new parameter passed to Pipeline
+        filtered_n_samples=args.filtered_n_samples,
+        api_temperature=args.api_temperature  # pass temperature parameter
     )
 
     pipeline.run(

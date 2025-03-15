@@ -31,7 +31,8 @@ class Pipeline:
         api_base_url: Optional[str] = None,
         target_filtered_topics: int = 25,
         species: int = 9606,
-        filtered_n_samples: int = 10  # new parameter for filtered sets topic modeling
+        filtered_n_samples: int = 10,  # new parameter for filtered sets topic modeling
+        api_temperature: float = 0.2    # new temperature parameter
     ):
         self.output_dir = os.path.abspath(output_dir)
 
@@ -56,6 +57,7 @@ class Pipeline:
         self.target_filtered_topics = target_filtered_topics
         self.species = species  # Save species as an instance variable
         self.filtered_n_samples = filtered_n_samples  # store new parameter
+        self.api_temperature = api_temperature  # store temperature parameter
 
         # Create directories
         os.makedirs(self.output_dir, exist_ok=True)
@@ -408,7 +410,8 @@ class Pipeline:
             service=self.api_service,
             model=self.api_model,
             base_url=self.api_base_url,
-            n_jobs=self.api_parallel_jobs
+            n_jobs=self.api_parallel_jobs,
+            temperature=self.api_temperature  # pass temperature parameter
         )
         return api_results_df
 
@@ -608,6 +611,8 @@ if __name__ == "__main__":
     parser.add_argument("--temp_dir", type=str, default=None, help="Temporary directory for intermediate files.")
     parser.add_argument("--report_title", type=str, default=None, help="Title for the generated report.")
     parser.add_argument("--filtered_n_samples", type=int, default=10, help="Number of topic models to run on filtered sets.")
+    parser.add_argument("--api_temperature", type=float, default=0.2,
+                        help="Sampling temperature for API calls (default: 0.2).")
     parser.add_argument("-v", "--verbosity",
                         default="info",
                         choices=["none", "debug", "info", "warning", "error", "critical"],
@@ -642,7 +647,8 @@ if __name__ == "__main__":
         api_base_url=args.api_base_url,
         target_filtered_topics=args.target_filtered_topics,
         species=args.species,
-        filtered_n_samples=args.filtered_n_samples
+        filtered_n_samples=args.filtered_n_samples,
+        api_temperature=args.api_temperature  # pass temperature parameter
     )
 
     pipeline.run(

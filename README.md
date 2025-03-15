@@ -42,21 +42,20 @@ uv pip install -e .
 
 ```
 
-### Using UV (faster installation)
+### Using UV (recommended)
 
 ```bash
 # Install UV if you don't have it yet
-pip install uv
 
 # Install directly from GitHub with UV
 uv pip install git+https://github.com/wlchin/geneinsight.git
 
-# Or create a Python 3.9 virtual environment and install in development mode
-uv venv --python=3.9
+# Or create a Python 3.10 virtual environment and install in development mode (recommended)
+uv venv --python=3.10
 source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
 git clone https://github.com/wlchin/geneinsight.git
 cd geneinsight
-uv pip install -e .
+uv pip install .
 ```
 
 ## Quick Start

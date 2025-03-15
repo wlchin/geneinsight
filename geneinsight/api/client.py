@@ -47,7 +47,8 @@ def fetch_subtopic_heading(
     service: str = "openai",
     api_key: Optional[str] = None,
     model: str = "gpt-4o-mini",
-    base_url: Optional[str] = None
+    base_url: Optional[str] = None,
+    temperature: float = 0.2  # new parameter added with default value
 ) -> str:
     """
     Get a subtopic heading from the API.
@@ -59,6 +60,7 @@ def fetch_subtopic_heading(
         api_key: API key.
         model: Model to use.
         base_url: Base URL for the API service.
+        temperature: Sampling temperature for the model.
 
     Returns:
         The generated topic heading or an error string if something fails.
@@ -92,7 +94,7 @@ def fetch_subtopic_heading(
             model=model,
             messages=messages,
             response_model=TopicHeading,
-            temperature = 0.2
+            temperature=temperature  # parameter passed here
         )
 
         return response.topic if hasattr(response, 'topic') else str(response)
@@ -109,6 +111,7 @@ def process_subtopic_row(
     api_key: Optional[str] = None,
     model: str = "gpt-4o-mini",
     base_url: Optional[str] = None,
+    temperature: float = 0.2  # added temperature parameter
 ) -> Dict[str, Any]:
     """
     Process a single row for subtopic generation.
@@ -119,6 +122,7 @@ def process_subtopic_row(
         api_key: API key.
         model: Model to use.
         base_url: Base URL for the API service.
+        temperature: Sampling temperature for the model.
 
     Returns:
         Dictionary with the row data and generated result.
@@ -144,7 +148,8 @@ def process_subtopic_row(
         service=service,
         api_key=api_key,
         model=model,
-        base_url=base_url
+        base_url=base_url,
+        temperature=temperature  # pass temperature
     )
 
     return {
@@ -161,7 +166,8 @@ def batch_process_api_calls(
     service: str = "openai",
     model: str = "gpt-4o-mini",
     base_url: Optional[str] = None,
-    n_jobs: int = 4
+    n_jobs: int = 4,
+    temperature: float = 0.2  # added temperature parameter
 ) -> pd.DataFrame:
     """
     Batch process API calls for subtopic generation.
@@ -173,6 +179,7 @@ def batch_process_api_calls(
         model: Which model to use.
         base_url: Base URL for the API service.
         n_jobs: Number of parallel workers.
+        temperature: Sampling temperature for the model.
 
     Returns:
         DataFrame with the results.
@@ -208,7 +215,8 @@ def batch_process_api_calls(
             service=service,
             api_key=api_key,
             model=model,
-            base_url=base_url
+            base_url=base_url,
+            temperature=temperature  # pass temperature
         )
         for _, row in tqdm(df_subtopic.iterrows(), total=len(df_subtopic), desc="Processing subtopics")
     )

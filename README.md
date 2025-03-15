@@ -137,6 +137,30 @@ options:
                         Set logging verbosity. Use 'none' to disable logging. Default is 'none'.
 ```
 
+## Command Line Arguments
+
+The GeneInsight pipeline can be customized with various command line arguments:
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `query_gene_set` | Path to file containing the query gene set | Required |
+| `background_gene_list` | Path to file containing the background gene list | Required |
+| `-o`, `--output_dir` | Directory to store final outputs | ./output |
+| `--no-report` | Skip generating an HTML report | False |
+| `--n_samples` | Number of topic models to run with different seeds | 5 |
+| `--filtered_n_samples` | Number of topic models to run on filtered gene sets | 10 |
+| `--num_topics` | Number of topics to extract in topic modeling | None (auto) |
+| `--pvalue_threshold` | Adjusted P-value threshold for filtering results | 0.05 |
+| `--api_service` | API service for topic refinement | openai |
+| `--api_model` | Model name for the API service | gpt-4o-mini |
+| `--api_parallel_jobs` | Number of parallel API jobs | 1 |
+| `--api_base_url` | Base URL for the API service | None |
+| `--target_filtered_topics` | Target number of topics after filtering | 25 |
+| `--temp_dir` | Temporary directory for intermediate files | None |
+| `--report_title` | Title for the generated report | None |
+| `--species` | Species identifier (9606 for human) | 9606 |
+| `-v`, `--verbosity` | Set logging verbosity | none |
+
 ## API Support
 
 Geneinsight supports two API services for topic refinement:
@@ -228,6 +252,19 @@ This modular approach gives you complete control over the pipeline and allows yo
 - Resume processing from any point if a step fails
 - Run only the specific steps you need
 - Integrate individual steps into your own workflows
+
+## Pipeline Configuration
+
+The GeneInsight pipeline uses a two-stage topic modeling approach:
+
+1. Initial topic modeling on the gene enrichment data (`n_samples` parameter)
+2. Secondary topic modeling on filtered gene sets (`filtered_n_samples` parameter)
+
+For optimal results with larger datasets, you may want to increase both parameters. For example:
+
+```bash
+geneinsight query_genes.txt background_genes.txt --n_samples 10 --filtered_n_samples 15
+```
 
 ## License
 

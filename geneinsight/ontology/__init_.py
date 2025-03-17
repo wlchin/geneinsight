@@ -6,15 +6,4 @@ This package provides tools for:
 2. Converting enrichment results to term-gene dictionaries
 3. Orchestrating full ontology analysis workflows
 """
-# Import directly in the modules that need these, not here
-# to avoid circular imports
 
-__all__ = [
-    'OntologyWorkflow',
-    'RAGModuleGSEAPY',
-    'OntologyReader',
-    'HypergeometricGSEA',
-    'process_ontology_enrichment',
-    'save_ontology_dictionary'
-]
-"""

@@ -10,8 +10,6 @@ from typing import Dict, Optional
 # Rich for stage announcements
 from rich.console import Console
 
-from geneinsight.ontology.workflow import OntologyWorkflow
-
 logger = logging.getLogger(__name__)
 
 
@@ -581,6 +579,7 @@ class Pipeline:
         """
         logger.info("Running ontology enrichment analysis")
         ontology_folder = os.path.join(os.path.dirname(__file__), "ontology", "ontology_folders")
+        from .ontology.workflow import OntologyWorkflow
         workflow = OntologyWorkflow(
             ontology_folder=ontology_folder,
             fdr_threshold=self.pvalue_threshold,

@@ -131,7 +131,7 @@ setup(
     },
 
     package_data={
-        'topicgenes.report': ['assets/*.png'],
+        'geneinsight.report': ['assets/*.png'],
         'geneinsight.ontology.ontology_folders': ['*.txt'],  # Include all .txt files in ontology_folders
     }
 )

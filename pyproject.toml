@@ -87,6 +87,7 @@ geneinsight-meta = "geneinsight.scripts.geneinsight_meta:main"
 geneinsight-counter = "geneinsight.scripts.geneinsight_counter:main"
 geneinsight-report = "geneinsight.scripts.geneinsight_report_pipeline:main"
 geneinsight-ontology = "geneinsight.ontology.workflow:main"
+geneinsight-examples = "geneinsight.scripts.geneinsight_examples:main"
 
 [tool.setuptools]
 include-package-data = true
@@ -95,6 +96,7 @@ packages = {find = {exclude = ["tests"]}}
 [tool.setuptools.package-data]
 "geneinsight.report" = ["assets/*.png"]
 "geneinsight.ontology.ontology_folders" = ["*.txt"]
+"geneinsight.examples" = ["*.txt", "*.md"]
 
 [tool.setuptools.exclude-package-data]
 "*" = ["tests/*"]

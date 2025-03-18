@@ -7,8 +7,8 @@ import tempfile
 from typing import Optional, List, Dict, Any, Union, Tuple
 import importlib.resources as pkg_resources
 
-from geneinsight.ontology.calculate_ontology_enrichment import RAGModuleGSEAPY, OntologyReader, HypergeometricGSEA
-from geneinsight.ontology.get_ontology_dictionary import process_ontology_enrichment
+from .ontology.calculate_ontology_enrichment import RAGModuleGSEAPY, OntologyReader, HypergeometricGSEA
+from .ontology.get_ontology_dictionary import process_ontology_enrichment
 
 # Configure logging
 logging.basicConfig(

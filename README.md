@@ -171,6 +171,28 @@ By default, Geneinsight generates an interactive HTML report visualizing the res
 
 To customize the report, use the `--report_title` parameter.
 
+## Examples
+
+Geneinsight provides example files to help you quickly get started with gene set analysis:
+
+```bash
+# Create an examples folder in your current directory
+geneinsight-examples
+
+# Or specify a custom destination
+geneinsight-examples --path /path/to/destination
+```
+
+The examples folder contains:
+- 2 sample text files with an example gene set and its background set.
+- A README.md with documentation on how to use the examples
+
+For a quick start, try running:
+
+```bash
+geneinsight examples/sample.txt examples/sample_background.txt -o ./output
+```
+
 ## License
 
 This project is licensed under the MIT License.

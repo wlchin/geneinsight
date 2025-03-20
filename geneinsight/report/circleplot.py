@@ -6,9 +6,45 @@ import os
 import logging
 import pandas as pd
 import numpy as np
+import pkg_resources
 from typing import List, Dict, Optional, Union, Tuple
 
 logger = logging.getLogger(__name__)
+
+def get_embedding_model(model_name: str = None):
+    """
+    Load the SentenceTransformer model from the package's embedding_model folder
+    
+    Args:
+        model_name: Name of a specific model to load (unused, kept for backward compatibility)
+        
+    Returns:
+        SentenceTransformer: The loaded model
+    """
+    try:
+        # Import here to make it an optional dependency
+        from sentence_transformers import SentenceTransformer
+        
+        # Get the path to the embedding_model directory in the package
+        model_path = pkg_resources.resource_filename('geneinsight', 'embedding_model')
+        
+        # Verify the model directory exists
+        if not os.path.exists(model_path):
+            logger.warning(f"Embedding model directory not found at {model_path}")
+            logger.info("Falling back to online model 'all-MiniLM-L6-v2'...")
+            return SentenceTransformer("all-MiniLM-L6-v2")
+        
+        logger.info(f"Loading embedding model from {model_path}")
+        
+        # Load the model from the package directory
+        model = SentenceTransformer(model_path)
+        
+        return model
+    except Exception as e:
+        logger.error(f"Error loading embedding model: {e}")
+        logger.info("Falling back to online model 'all-MiniLM-L6-v2'...")
+        from sentence_transformers import SentenceTransformer
+        return SentenceTransformer("all-MiniLM-L6-v2")
 
 def generate_circle_plot(
     input_csv: str,
@@ -16,7 +52,8 @@ def generate_circle_plot(
     headings_csv: Optional[str] = None,
     embedding_model: str = 'all-MiniLM-L6-v2',
     n_components: int = 2,
-    extra_vectors_csv: Optional[str] = None
+    extra_vectors_csv: Optional[str] = None,
+    use_local_model: bool = True
 ) -> None:
     """
     Generate an interactive circle plot of topic embeddings using UMAP and Plotly.
@@ -25,9 +62,10 @@ def generate_circle_plot(
         input_csv: Path to input CSV with 'Term' and 'Cluster' columns
         output_html: Path to save the output HTML visualization
         headings_csv: Path to CSV with cluster headings (columns: 'cluster' and 'heading')
-        embedding_model: Name of the sentence transformer model to use
+        embedding_model: Name of the sentence transformer model to use (for backward compatibility)
         n_components: Number of UMAP dimensions (2 or 3)
         extra_vectors_csv: Path to CSV with additional terms to include in UMAP (optional)
+        use_local_model: Whether to use the locally packaged model (default: True)
     """
     try:
         # Create the directory for the output file if it doesn't exist
@@ -79,9 +117,13 @@ def generate_circle_plot(
             except Exception as e:
                 logger.warning(f"Error loading extra terms: {e}")
         
-        # Step 1: Embed the main terms
-        logger.info(f"Loading sentence transformer model: {embedding_model}")
-        model = SentenceTransformer(embedding_model)
+        # Step 1: Get the embedding model (either local or remote)
+        if use_local_model:
+            logger.info("Using locally packaged sentence transformer model")
+            model = get_embedding_model()
+        else:
+            logger.info(f"Loading sentence transformer model: {embedding_model}")
+            model = SentenceTransformer(embedding_model)
         
         if 'Term' not in df.columns:
             logger.error("Input CSV does not have required column 'Term'")
@@ -178,3 +220,36 @@ def generate_circle_plot(
         logger.error(f"Error generating circle plot: {e}")
         import traceback
         traceback.print_exc()
+
+def main():
+    """Command-line interface for circle plot generation."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Generate interactive circle plots using UMAP embeddings.")
+    parser.add_argument("--input_csv", required=True, help="Path to input CSV with 'Term' and 'Cluster' columns")
+    parser.add_argument("--output_html", required=True, help="Path to save the output HTML visualization")
+    parser.add_argument("--headings_csv", help="Path to CSV with cluster headings (columns: 'cluster' and 'heading')")
+    parser.add_argument("--n_components", type=int, default=2, help="Number of UMAP dimensions (2 or 3)")
+    parser.add_argument("--extra_vectors_csv", help="Path to CSV with additional terms to include in UMAP")
+    parser.add_argument("--use_external_model", action="store_true", 
+                        help="Use external model instead of locally packaged model")
+    
+    args = parser.parse_args()
+    
+    generate_circle_plot(
+        input_csv=args.input_csv,
+        output_html=args.output_html,
+        headings_csv=args.headings_csv,
+        n_components=args.n_components,
+        extra_vectors_csv=args.extra_vectors_csv,
+        use_local_model=not args.use_external_model  # Default to local model unless specified
+    )
+
+if __name__ == "__main__":
+    # Configure logging if run as a script
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    main()

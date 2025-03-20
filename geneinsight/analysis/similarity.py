@@ -8,6 +8,7 @@ import argparse
 import logging
 import sys
 import os
+import pkg_resources
 from typing import List, Tuple, Optional
 from sentence_transformers import SentenceTransformer
 from scipy.spatial.distance import cosine
@@ -23,6 +24,37 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger(__name__)
+
+def get_embedding_model(model_name: str = None):
+    """
+    Load the SentenceTransformer model from the package's embedding_model folder
+    
+    Args:
+        model_name: Name of a specific model to load (unused, kept for backward compatibility)
+        
+    Returns:
+        SentenceTransformer: The loaded model
+    """
+    try:
+        # Get the path to the embedding_model directory in the package
+        model_path = pkg_resources.resource_filename('geneinsight', 'embedding_model')
+        
+        # Verify the model directory exists
+        if not os.path.exists(model_path):
+            logger.warning(f"Embedding model directory not found at {model_path}")
+            logger.info("Falling back to online model 'paraphrase-MiniLM-L6-v2'...")
+            return SentenceTransformer('paraphrase-MiniLM-L6-v2')
+        
+        logger.info(f"Loading embedding model from {model_path}")
+        
+        # Load the model from the package directory
+        model = SentenceTransformer(model_path)
+        
+        return model
+    except Exception as e:
+        logger.error(f"Error loading embedding model: {e}")
+        logger.info("Falling back to online model 'paraphrase-MiniLM-L6-v2'...")
+        return SentenceTransformer('paraphrase-MiniLM-L6-v2')
 
 def cosine_similarity(vec1, vec2) -> float:
     """
@@ -130,7 +162,8 @@ def filter_terms_by_similarity(
     input_csv: str,
     output_csv: str,
     target_rows: int = 100,
-    model_name: str = 'paraphrase-MiniLM-L6-v2'
+    model_name: str = 'paraphrase-MiniLM-L6-v2',
+    use_local_model: bool = True
 ) -> pd.DataFrame:
     """
     Filter terms by semantic similarity and term frequency.
@@ -139,7 +172,8 @@ def filter_terms_by_similarity(
         input_csv: Path to input CSV file
         output_csv: Path to output CSV file
         target_rows: Desired number of rows after filtering
-        model_name: Name of the SentenceTransformer model to use
+        model_name: Name of the SentenceTransformer model to use (for backward compatibility)
+        use_local_model: Whether to use the locally packaged model (default: True)
         
     Returns:
         Filtered DataFrame
@@ -151,8 +185,12 @@ def filter_terms_by_similarity(
     logger.info(f"Loaded {len(df)} terms from input CSV")
     
     # Initialize the model
-    logger.info(f"Initializing SentenceTransformer model: {model_name}")
-    model = SentenceTransformer(model_name)
+    if use_local_model:
+        logger.info("Using locally packaged SentenceTransformer model")
+        model = get_embedding_model()
+    else:
+        logger.info(f"Using online SentenceTransformer model: {model_name}")
+        model = SentenceTransformer(model_name)
     
     # Embed the terms
     logger.info("Embedding terms...")
@@ -218,7 +256,8 @@ def main():
     parser.add_argument('input_csv', type=str, help='Path to the input CSV file')
     parser.add_argument('output_csv', type=str, help='Path to the output CSV file')
     parser.add_argument('target_rows', type=int, help='Desired approximate number of filtered rows', nargs='?', default=100)
-    parser.add_argument('--model', type=str, default='paraphrase-MiniLM-L6-v2', help='SentenceTransformer model to use')
+    parser.add_argument('--model', type=str, default='paraphrase-MiniLM-L6-v2', help='SentenceTransformer model to use (when using external model)')
+    parser.add_argument('--use_external_model', action='store_true', help='Use external model instead of locally packaged model')
     
     args = parser.parse_args()
     
@@ -226,7 +265,8 @@ def main():
         input_csv=args.input_csv,
         output_csv=args.output_csv,
         target_rows=args.target_rows,
-        model_name=args.model
+        model_name=args.model,
+        use_local_model=not args.use_external_model  # Default to local model unless specified
     )
 
 if __name__ == "__main__":

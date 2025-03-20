@@ -2,29 +2,42 @@ import csv
 import ast
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 import argparse
 import logging
 from datetime import datetime
 import random
 import requests
 from xml.etree import ElementTree
-from tqdm import tqdm  # Add this import for progress bar
-import pandas as pd  # Add this import for reading CSV files
+from tqdm import tqdm
+import pandas as pd
 import re
 import shutil
 import os
 import logging
 
+# Species-specific pathway prefixes for KEGG and other databases
+SPECIES_PATHWAY_PREFIX = {
+    "9606": "hsa",  # Human
+    "10090": "mmu", # Mouse
+    "10116": "rno", # Rat
+    "7955": "dre",  # Zebrafish
+    "7227": "dme",  # Fruit fly
+    "6239": "cel",  # C. elegans
+    "4932": "sce"   # Yeast
+}
+
 class IDToHyperlink:
     """
     A class to generate hyperlinks based on different biological database identifiers.
+    Species-aware where appropriate.
     """
+    # Base URLs for different identifier types
     BASE_URLS = {
         "GO": "https://www.ebi.ac.uk/QuickGO/term/{}",
         "WP": "https://www.wikipathways.org/pathways/{}.html",
         "HP": "https://hpo.jax.org/browse/term/{}",
-        "BTO": "https://tissues.jensenlab.org/Entity?order=textmining,knowledge,experiments&knowledge=10&experiments=10&textmining=10&type1=-25&type2=9606&id1={}",
+        "BTO": "https://tissues.jensenlab.org/Entity?order=textmining,knowledge,experiments&knowledge=10&experiments=10&textmining=10&type1=-25&type2={}&id1={}",
         "IPR": "https://www.ebi.ac.uk/interpro/entry/InterPro/{}",
         "SM": "https://www.ebi.ac.uk/interpro/entry/smart/{}",
         "PF": "https://www.ebi.ac.uk/interpro/entry/pfam/{}",
@@ -35,8 +48,9 @@ class IDToHyperlink:
         "hsa": "https://www.genome.jp/dbget-bin/www_bget?pathway:{}"
     }
 
-    def __init__(self, identifier: str):
+    def __init__(self, identifier: str, taxonomy_id: str = "9606"):
         self.identifier = identifier
+        self.taxonomy_id = taxonomy_id
 
     def get_hyperlink(self) -> str:
         """Returns the hyperlink corresponding to the given identifier."""
@@ -46,18 +60,40 @@ class IDToHyperlink:
         if self.identifier.startswith("PMID:"):
             normalized_identifier = self.identifier.replace("PMID:", "")
             return self.BASE_URLS["PMID"].format(normalized_identifier)
+        
+        # Handle species-specific pathway identifiers (KEGG)
+        for prefix in SPECIES_PATHWAY_PREFIX.values():
+            if self.identifier.startswith(prefix):
+                return self.BASE_URLS["hsa"].format(self.identifier)
+        
+        # Handle BTO with taxonomy ID
+        if self.identifier.startswith("BTO:"):
+            return self.BASE_URLS["BTO"].format(self.taxonomy_id, self.identifier)
+            
+        # Default handling for other identifiers
         prefix = self.identifier[:4]
         for key in self.BASE_URLS:
             if key in prefix:
                 return self.BASE_URLS[key].format(self.identifier)
+        
         return f"Unknown identifier format: {self.identifier}"
 
-def get_gene_summary(gene_name, organism="Homo sapiens"):
+def get_gene_summary(gene_name: str, taxonomy_id: str = "9606") -> Tuple[Optional[str], str]:
+    """
+    Get gene summary from NCBI using eutils API.
+    
+    Args:
+        gene_name: The name of the gene to look up
+        taxonomy_id: The NCBI taxonomy ID (e.g., "9606" for human, "10090" for mouse)
+        
+    Returns:
+        Tuple of (gene_id, summary_text)
+    """
     # Step 1: Search for the Gene ID
     search_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
     params = {
         "db": "gene",
-        "term": f"{gene_name}[Gene Name] AND {organism}[Organism]",
+        "term": f"{gene_name}[Gene Name] AND txid{taxonomy_id}[Organism:exp]",
         "retmode": "json"
     }
     
@@ -65,7 +101,7 @@ def get_gene_summary(gene_name, organism="Homo sapiens"):
     gene_ids = response.get("esearchresult", {}).get("idlist", [])
     
     if not gene_ids:
-        return f"No gene found for {gene_name} in {organism}"
+        return None, f"No gene found for {gene_name} in taxonomy ID {taxonomy_id}"
     
     gene_id = gene_ids[0]  # Take the first match
 
@@ -150,16 +186,20 @@ def create_clustered_sections(
 
     return clustered_sections
 
-def parse_brackets_to_hyperlinks(text: str) -> str:
+def parse_brackets_to_hyperlinks(text: str, taxonomy_id: str = "9606") -> str:
+    """
+    Convert identifiers in brackets to hyperlinks.
+    Now species-aware with taxonomy_id parameter.
+    """
     pattern = r'\(([^()]+)\)'
     replaced = text
     matches = re.findall(pattern, text)
     for match in matches:
-        link = IDToHyperlink(match).get_hyperlink()
+        link = IDToHyperlink(match, taxonomy_id).get_hyperlink()
         replaced = replaced.replace(f"({match})", f"`({match}) <{link}>`_")
     return replaced
 
-def generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api):
+def generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api, taxonomy_id="9606"):
     """
     Generate an RST file with given headings and content.
 
@@ -167,7 +207,9 @@ def generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api):
     :param sections: List of dictionaries, each containing 'title' or 'subtitle', and optionally other keys
     :param filtered_genesets_df: DataFrame containing filtered genesets data
     :param call_ncbi_api: Boolean indicating whether to call the NCBI API
+    :param taxonomy_id: NCBI taxonomy ID (e.g., "9606" for human, "10090" for mouse)
     """
+    
     with open(filename, 'w') as f:
         for section in sections:
             if 'title' in section:
@@ -188,10 +230,17 @@ def generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api):
                 top_5 = code_items[:5]
                 top_5_keys = []
                 for k, _ in top_5:
-                    logging.info(f"Fetching summary for gene: {k}")
+                    logging.info(f"Fetching summary for gene: {k} in taxonomy ID {taxonomy_id}")
                     if call_ncbi_api:
-                        gene_id, summary_text = get_gene_summary(k)
-                        top_5_keys.append(f"`{k} <https://www.ncbi.nlm.nih.gov/gene/{gene_id}>`_")
+                        gene_id, summary_text = get_gene_summary(k, taxonomy_id)
+                        if gene_id:
+                            # Use summary text as the abbreviation and include hyperlink
+                            summary_abbr = summary_text[:200] + "..." if len(summary_text) > 200 else summary_text
+                            # Escape quotes in summary text to prevent RST syntax errors
+                            summary_abbr = summary_abbr.replace('"', '\\"').replace("'", "\\'")
+                            top_5_keys.append(f":abbr:`{k} ({summary_abbr})` `🔗 <https://www.ncbi.nlm.nih.gov/gene/{gene_id}>`_")
+                        else:
+                            top_5_keys.append(f":abbr:`{k} (No gene ID found for taxonomy ID {taxonomy_id})`")
                     else:
                         top_5_keys.append(f":abbr:`{k} ()`")
                 keys_str = ", ".join(top_5_keys)
@@ -230,7 +279,7 @@ def generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api):
             if section.get('references'):
                 f.write(":abbr:`StringDB references (StringDB entries used by the GenesetInsight to construct the geneset associated with theme above)`\n\n")
                 for reference in section.get('references'):
-                    replaced_text = parse_brackets_to_hyperlinks(reference)
+                    replaced_text = parse_brackets_to_hyperlinks(reference, taxonomy_id)
                     f.write(f"- {replaced_text}\n")
                 f.write("\n")
 
@@ -238,7 +287,7 @@ def generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api):
             if section.get('thematic_geneset'):
                 f.write(":abbr:`Ontology genesets (Genesets from GO and HPO ontologies enriched based on hypergeometric testing in relation to the theme geneset)`\n\n")
                 for geneset in section.get('thematic_geneset'):
-                    replaced_geneset = parse_brackets_to_hyperlinks(geneset)
+                    replaced_geneset = parse_brackets_to_hyperlinks(geneset, taxonomy_id)
                     f.write(f"- {replaced_geneset}\n")
                 f.write("\n")
 
@@ -269,12 +318,14 @@ def main():
     parser.add_argument('--log_file', required=False, default=None, help="Optional logfile to record output details.")
     parser.add_argument('--call_ncbi_api', action='store_true', help="Whether to call the NCBI API.")
     parser.add_argument('--csv_folder', required=True, help="Folder to save the per-cluster CSV files.")
+    parser.add_argument('--taxonomy_id', default="9606", help="NCBI taxonomy ID (default: 9606 for human)")
     args = parser.parse_args()
 
     # Setup logging
     log_format = "%(asctime)s - %(message)s"
     logging.basicConfig(filename=args.log_file, level=logging.INFO, format=log_format)
-    logging.info("Starting RST file generation")
+    species_prefix = SPECIES_PATHWAY_PREFIX.get(args.taxonomy_id, "unknown")
+    logging.info(f"Starting RST file generation for taxonomy ID: {args.taxonomy_id} (prefix: {species_prefix})")
 
     # make sure the csv_folder exists
     if not os.path.exists(args.csv_folder):
@@ -298,7 +349,13 @@ def main():
 
     for cluster_id, sections in clustered_sections.items():
         rst_filename = output_dir / f"cluster_{cluster_id}.rst"
-        generate_rst_file(str(rst_filename), sections, filtered_genesets_df, args.call_ncbi_api)
+        generate_rst_file(
+            str(rst_filename), 
+            sections, 
+            filtered_genesets_df, 
+            args.call_ncbi_api,
+            args.taxonomy_id
+        )
         num_references = sum(len(section.get('references', [])) for section in sections)
         num_thematic_genesets = sum(len(section.get('thematic_geneset', [])) for section in sections)
         logging.info(f"Wrote {rst_filename} with {len(sections)} section(s), {num_references} references, and {num_thematic_genesets} thematic genesets.")
@@ -334,6 +391,7 @@ def main():
                         odds_ratio = random.uniform(0.5, 2.0)
                         p_value = random.uniform(0.01, 0.05)
                         combined_score = random.uniform(1, 10)
+                        p_val = random.uniform(0.001, 0.01)
                     writer.writerow({
                         "subtitle": subtitlestr,
                         "odds_ratio": f"{odds_ratio:.2f}",
@@ -343,7 +401,7 @@ def main():
                         "gene_set": ";".join(code_dict.keys())
                     })
 
-    logging.info("RST file generation completed")
+    logging.info(f"RST file generation completed for taxonomy ID: {args.taxonomy_id} (prefix: {species_prefix})")
 
 if __name__ == "__main__":
     main()

@@ -90,12 +90,20 @@ def fetch_subtopic_heading(
             {"role": "user", "content": user_prompt}
         ]
 
-        response: TopicHeading = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            response_model=TopicHeading,
-            temperature=temperature  # parameter passed here
-        )
+        # Check if service is openai and model contains "o3" - if so, don't use temperature
+        if service.lower() == "openai" and "o3" in model:
+            response: TopicHeading = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                response_model=TopicHeading
+            )
+        else:
+            response: TopicHeading = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                response_model=TopicHeading,
+                temperature=temperature
+            )
 
         return response.topic if hasattr(response, 'topic') else str(response)
 

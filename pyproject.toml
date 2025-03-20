@@ -97,6 +97,7 @@ packages = {find = {exclude = ["tests"]}}
 "geneinsight.report" = ["assets/*.png"]
 "geneinsight.ontology.ontology_folders" = ["*.txt"]
 "geneinsight.examples" = ["*.txt", "*.md"]
+"geneinsight.embedding_model" = ["*.json", "*.txt", "tokenizer.json", "*.bin"]
 
 [tool.setuptools.exclude-package-data]
 "*" = ["tests/*"]

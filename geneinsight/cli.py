@@ -46,13 +46,17 @@ def main():
     # New argument for controlling number of topic models on filtered sets
     parser.add_argument("--filtered_n_samples", type=int, default=10,
                         help="Number of topic models to run on filtered sets (default 10).")
-    # New argument for controlling verbosity
+    # New argument for controlling API temperature
+    parser.add_argument("--api_temperature", type=float, default=0.2,
+                        help="Sampling temperature for API calls (default: 0.2).")
+    # Changed from --no-ncbi-api to --enable-ncbi-api to make disabled the default
+    parser.add_argument("--enable-ncbi-api", action="store_true",
+                        help="Enable NCBI API calls for gene summaries (disabled by default).")
+    # Argument for controlling verbosity
     parser.add_argument("-v", "--verbosity",
                         default="none",
                         choices=["none", "debug", "info", "warning", "error", "critical"],
-                        help="Set logging verbosity. Use 'none' to disable logging. Default is 'info'.")
-    parser.add_argument("--api_temperature", type=float, default=0.2,
-                        help="Sampling temperature for API calls (default: 0.2).")
+                        help="Set logging verbosity. Use 'none' to disable logging. Default is 'none'.")
 
     args = parser.parse_args()
 
@@ -74,6 +78,20 @@ def main():
 
     logger.debug("Debug mode is on.")
     logger.info("Initializing GeneInsight pipeline from CLI...")
+    
+    # Log species and NCBI API settings
+    species_names = {
+        9606: "Human",
+        10090: "Mouse",
+        10116: "Rat",
+        7955: "Zebrafish",
+        7227: "Fruit fly",
+        6239: "C. elegans",
+        4932: "Yeast"
+    }
+    species_name = species_names.get(args.species, f"Species ID {args.species}")
+    logger.info(f"Using species: {species_name} (taxonomy ID: {args.species})")
+    logger.info(f"NCBI API calls: {'enabled' if args.enable_ncbi_api else 'disabled'}")
 
     pipeline = Pipeline(
         output_dir=args.output_dir,
@@ -88,15 +106,22 @@ def main():
         target_filtered_topics=args.target_filtered_topics,
         species=args.species,
         filtered_n_samples=args.filtered_n_samples,
-        api_temperature=args.api_temperature  # pass temperature parameter
+        api_temperature=args.api_temperature,  # pass temperature parameter
+        call_ncbi_api=args.enable_ncbi_api     # NCBI API calls disabled by default, enabled with flag
     )
 
-    pipeline.run(
-        query_gene_set=args.query_gene_set,
-        background_gene_list=args.background_gene_list,
-        generate_report=not args.no_report,
-        report_title=args.report_title
-    )
+    try:
+        pipeline.run(
+            query_gene_set=args.query_gene_set,
+            background_gene_list=args.background_gene_list,
+            generate_report=not args.no_report,
+            report_title=args.report_title
+        )
+        logger.info("GeneInsight pipeline completed successfully.")
+        return 0
+    except Exception as e:
+        logger.error(f"Error running GeneInsight pipeline: {e}", exc_info=True)
+        return 1
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

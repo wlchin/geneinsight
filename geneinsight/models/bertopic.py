@@ -9,6 +9,7 @@ import sys
 import logging
 import signal
 import pandas as pd
+import pkg_resources
 from typing import List, Tuple, Optional, Union
 from datetime import datetime
 
@@ -18,6 +19,16 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import CountVectorizer
 from sentence_transformers import SentenceTransformer
+import warnings
+
+warnings.filterwarnings("ignore", message="No sentence-transformers model found with name")
+
+class SpecificWarningFilter(logging.Filter):
+    def filter(self, record):
+        # Exclude the specific warning message
+        if "No sentence-transformers model found with name" in record.getMessage():
+            return False
+        return True
 
 # Configure logging
 logging.basicConfig(
@@ -26,6 +37,30 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger(__name__)
+
+sentence_transformer_logger = logging.getLogger('sentence_transformers')
+sentence_transformer_logger.setLevel(logging.ERROR)
+
+def get_embedding_model():
+    """
+    Load the SentenceTransformer model from the package's embedding_model folder
+    
+    Returns:
+    SentenceTransformer: The loaded model
+    """
+    # Get the path to the embedding_model directory in the package
+    model_path = pkg_resources.resource_filename('geneinsight', 'embedding_model')
+    
+    # Verify the model directory exists
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Embedding model directory not found at {model_path}")
+    
+    logger.info(f"Loading embedding model from {model_path}")
+    
+    # Load the model from the package directory
+    model = SentenceTransformer(model_path)
+    
+    return model
 
 def load_csv_data(file_path: str) -> List[str]:
     """
@@ -44,7 +79,8 @@ def load_csv_data(file_path: str) -> List[str]:
 def initialize_bertopic(
     documents: List[str], 
     num_topics: Optional[int] = None, 
-    embeddings: Optional[List] = None
+    embeddings: Optional[List] = None,
+    sentence_model = None
 ) -> Tuple[BERTopic, List[int], List[float]]:
     """
     Initializes a BERTopic model and fits the given documents.
@@ -53,16 +89,23 @@ def initialize_bertopic(
         documents: List of documents to fit
         num_topics: Number of topics to extract
         embeddings: Pre-computed embeddings (optional)
+        sentence_model: SentenceTransformer model (optional)
         
     Returns:
         Tuple of (topic_model, topics, probabilities)
     """
     logger.info(f"Initializing BERTopic model with {num_topics} topics")
-    topic_model = BERTopic(nr_topics=num_topics)
+    
+    if sentence_model is not None:
+        topic_model = BERTopic(embedding_model=sentence_model, nr_topics=num_topics)
+    else:
+        topic_model = BERTopic(nr_topics=num_topics)
+        
     if embeddings is not None:
         topics, probs = topic_model.fit_transform(documents, embeddings)
     else:
         topics, probs = topic_model.fit_transform(documents)
+        
     return topic_model, topics, probs
 
 def initialize_kmeans_topic_model(
@@ -107,7 +150,8 @@ def initialize_model_and_fit_documents(
     num_topics: Optional[int] = 10, 
     ncomp: int = 2, 
     seed_value: int = 0, 
-    embeddings: Optional[List] = None
+    embeddings: Optional[List] = None,
+    sentence_model = None
 ) -> Tuple[BERTopic, List[int], List[float]]:
     """
     Initializes and fits a topic model using the specified method (BERTopic or KMeans).
@@ -119,6 +163,7 @@ def initialize_model_and_fit_documents(
         ncomp: Number of components for dimensionality reduction (KMeans only)
         seed_value: Random seed for reproducibility
         embeddings: Pre-computed embeddings (optional)
+        sentence_model: SentenceTransformer model (optional)
         
     Returns:
         Tuple of (topic_model, topics, probabilities)
@@ -127,7 +172,7 @@ def initialize_model_and_fit_documents(
     if method == "kmeans":
         return initialize_kmeans_topic_model(documents, num_topics=num_topics, ncomp=ncomp, seed_value=seed_value, embeddings=embeddings)
     elif method == "bertopic":
-        return initialize_bertopic(documents, num_topics=num_topics, embeddings=embeddings)
+        return initialize_bertopic(documents, num_topics=num_topics, embeddings=embeddings, sentence_model=sentence_model)
     else:
         raise ValueError(f"Unknown method: {method}. Supported methods are 'bertopic' and 'kmeans'.")
 
@@ -137,7 +182,8 @@ def run_topic_modeling_return_df(
     num_topics: Optional[int] = 10, 
     ncomp: int = 2, 
     seed_value: int = 0, 
-    embeddings: Optional[List] = None
+    embeddings: Optional[List] = None,
+    sentence_model = None
 ) -> pd.DataFrame:
     """
     Runs the specified topic modeling method and returns the document info as a dataframe.
@@ -149,6 +195,7 @@ def run_topic_modeling_return_df(
         ncomp: Number of components for dimensionality reduction (KMeans only)
         seed_value: Random seed for reproducibility
         embeddings: Pre-computed embeddings (optional)
+        sentence_model: SentenceTransformer model (optional)
         
     Returns:
         DataFrame containing document information and topic assignments
@@ -160,7 +207,8 @@ def run_topic_modeling_return_df(
         num_topics=num_topics,
         ncomp=ncomp,
         seed_value=seed_value,
-        embeddings=embeddings
+        embeddings=embeddings,
+        sentence_model=sentence_model
     )
     df_info = model.get_document_info(documents)
     return df_info
@@ -173,7 +221,8 @@ def run_multiple_seed_topic_modeling(
     ncomp: int = 2, 
     seed_value: int = 0, 
     n_samples: int = 1,
-    use_sentence_embeddings: bool = True
+    use_sentence_embeddings: bool = True,
+    use_local_model: bool = True
 ) -> pd.DataFrame:
     """
     Runs the topic modeling N times with different seeds,
@@ -188,6 +237,7 @@ def run_multiple_seed_topic_modeling(
         seed_value: Initial random seed value
         n_samples: Number of different seeds to use
         use_sentence_embeddings: Whether to use SentenceTransformer embeddings
+        use_local_model: Whether to use the locally packaged model (default: True)
         
     Returns:
         Concatenated DataFrame containing document information and topic assignments
@@ -198,11 +248,19 @@ def run_multiple_seed_topic_modeling(
     # Load documents
     documents = load_csv_data(input_file)
     
-    # Precompute embeddings if specified
+    # Get SentenceTransformer model and precompute embeddings if specified
     precomputed_embeddings = None
-    if use_sentence_embeddings and method == "bertopic":
-        logger.info("Precomputing embeddings using SentenceTransformer...")
-        sentence_model = SentenceTransformer("all-MiniLM-L6-v2")
+    sentence_model = None
+    
+    if use_sentence_embeddings:
+        if use_local_model:
+            logger.info("Using locally packaged SentenceTransformer model")
+            sentence_model = get_embedding_model()
+        else:
+            logger.info("Using default SentenceTransformer model 'all-MiniLM-L6-v2'")
+            sentence_model = SentenceTransformer("all-MiniLM-L6-v2")
+        
+        logger.info("Precomputing embeddings...")
         precomputed_embeddings = sentence_model.encode(documents, show_progress_bar=True)
 
     # Run topic modeling with each seed
@@ -215,7 +273,8 @@ def run_multiple_seed_topic_modeling(
             num_topics=num_topics, 
             ncomp=ncomp, 
             seed_value=seed,
-            embeddings=precomputed_embeddings
+            embeddings=precomputed_embeddings,
+            sentence_model=sentence_model
         )
         # Store which seed was used in a new column
         df_seed["seed"] = seed
@@ -251,8 +310,10 @@ def main():
     parser.add_argument("--ncomp", type=int, default=2, help="Number of components for dimensionality reduction (only for KMeans).")
     parser.add_argument("--seed_value", type=int, default=0, help="Initial seed value.")
     parser.add_argument("--n_samples", type=int, default=1, help="Number of topic models to run with different seeds.")
-    parser.add_argument("--use_sentence_embeddings", action="store_true",
-                        help="Whether to use SentenceTransformer embeddings for BERTopic.")
+    parser.add_argument("--use_sentence_embeddings", action="store_true", default=True,
+                        help="Whether to use SentenceTransformer embeddings for BERTopic (default: True).")
+    parser.add_argument("--use_external_model", action="store_true", 
+                        help="Use external model instead of the locally packaged model.")
 
     args = parser.parse_args()
 
@@ -264,7 +325,8 @@ def main():
         ncomp=args.ncomp,
         seed_value=args.seed_value,
         n_samples=args.n_samples,
-        use_sentence_embeddings=args.use_sentence_embeddings
+        use_sentence_embeddings=args.use_sentence_embeddings,
+        use_local_model=not args.use_external_model  # Default to local model unless specified
     )
 
 if __name__ == "__main__":

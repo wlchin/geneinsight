@@ -14,9 +14,48 @@ import ast
 import shutil
 import random
 import csv
+import time  # Added for time-based throttling
 from .generate_rst_from_files import create_clustered_sections, generate_rst_file, clear_csv_folder
 
-def generate_rst_files(headings_path, merged_path, filtered_sets_path, output_dir, csv_folder, call_ncbi_api=False):
+# A simple function that wraps the original generate_rst_file with throttling
+def throttled_generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api=False, taxonomy_id="9606", **kwargs):
+    """
+    A wrapper for generate_rst_file that adds a 1-second delay after processing each section
+    to throttle NCBI API calls.
+    
+    This function ensures we don't exceed NCBI's rate limit of 1 request per second.
+    """
+    # Process one section at a time with throttling
+    for i, section in enumerate(sections):
+        # Create a single-section list for this iteration
+        section_batch = [section]
+        
+        # Process just this section
+        generate_rst_file(
+            filename=filename + f".part{i}",  # Use temporary filename
+            sections=section_batch,
+            filtered_genesets_df=filtered_genesets_df,
+            call_ncbi_api=call_ncbi_api,
+            taxonomy_id=taxonomy_id,
+            **kwargs
+        )
+        
+        # Add delay after each section to throttle API calls
+        if call_ncbi_api:
+            time.sleep(1.0)  # 1 second delay
+    
+    # Now combine all the parts into the final file
+    with open(filename, 'w') as outfile:
+        for i in range(len(sections)):
+            part_file = filename + f".part{i}"
+            if os.path.exists(part_file):
+                with open(part_file, 'r') as infile:
+                    outfile.write(infile.read())
+                # Remove temporary part file
+                os.remove(part_file)
+
+def generate_rst_files(headings_path, merged_path, filtered_sets_path, output_dir, csv_folder, 
+                  taxonomy_id="9606", call_ncbi_api=False):
     """
     Generate RST files for the gene set analysis by leveraging functionality from generate_rst_from_files.py.
     
@@ -26,9 +65,11 @@ def generate_rst_files(headings_path, merged_path, filtered_sets_path, output_di
         filtered_sets_path (str): Path to the filtered gene sets CSV file.
         output_dir (str): Directory to save the generated RST files.
         csv_folder (str): Folder to save the per-cluster CSV files.
+        taxonomy_id (str): NCBI taxonomy ID (e.g., "9606" for human, "10090" for mouse).
         call_ncbi_api (bool): Whether to call the NCBI API for gene summaries.
     """
-    logging.info("Starting RST file generation using imported functions.")
+    throttling_msg = "with 1-second throttling" if call_ncbi_api else "without throttling"
+    logging.info(f"Starting RST file generation. Taxonomy ID: {taxonomy_id}, NCBI API calls: {throttling_msg}")
 
     try:
         # Ensure output directories exist
@@ -48,8 +89,24 @@ def generate_rst_files(headings_path, merged_path, filtered_sets_path, output_di
         for cluster_id, sections in clustered_sections.items():
             rst_filename = os.path.join(output_dir, f"cluster_{cluster_id}.rst")
             
-            # Generate the RST file using the imported generate_rst_file function
-            generate_rst_file(rst_filename, sections, filtered_genesets_df, call_ncbi_api)
+            # Use throttled version if making API calls
+            if call_ncbi_api:
+                throttled_generate_rst_file(
+                    filename=rst_filename, 
+                    sections=sections, 
+                    filtered_genesets_df=filtered_genesets_df, 
+                    call_ncbi_api=call_ncbi_api,
+                    taxonomy_id=taxonomy_id
+                )
+            else:
+                # Otherwise use the original function
+                generate_rst_file(
+                    filename=rst_filename, 
+                    sections=sections, 
+                    filtered_genesets_df=filtered_genesets_df, 
+                    call_ncbi_api=False,
+                    taxonomy_id=taxonomy_id
+                )
             
             # Log additional information
             num_references = sum(len(section.get('references', [])) for section in sections)
@@ -98,7 +155,7 @@ def generate_rst_files(headings_path, merged_path, filtered_sets_path, output_di
                             "combined_score": f"{combined_score:.2f}",
                             "gene_set": ";".join(code_dict.keys())
                         })
-        logging.info("RST file generation completed successfully.")
+        logging.info(f"RST file generation completed successfully for taxonomy ID: {taxonomy_id}")
         return True
     except Exception as e:
         logging.error(f"Error generating RST files: {e}")

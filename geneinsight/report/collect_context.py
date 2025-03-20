@@ -81,7 +81,8 @@ def call_api(
     api_key: str,
     model: str,
     base_url: str = None,
-    max_retries: int = 10
+    max_retries: int = 10,
+    temperature: float = 0.2
 ) -> str:
     """
     Generic API caller that supports both OpenAI and Ollama.
@@ -98,12 +99,23 @@ def call_api(
         else:
             raise ValueError(f"Unsupported service: {service}")
         
-        resp = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            response_model=response_model,
-            max_retries=max_retries
-        )
+        # Check if service is openai and model contains "o3" - if so, don't use temperature
+        if service.lower() == "openai" and "o3" in model:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                response_model=response_model,
+                max_retries=max_retries
+            )
+        else:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                response_model=response_model,
+                max_retries=max_retries,
+                temperature=temperature
+            )
+            
         return resp.topic
     except Exception as e:
         logging.error(f"API call failed: {e}")

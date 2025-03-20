@@ -7,6 +7,7 @@ from sentence_transformers import SentenceTransformer, util
 import gseapy as gp
 import argparse
 import ast
+import pkg_resources
 
 # ------------------------------------------------------------------
 # Configure Logging
@@ -17,6 +18,34 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger(__name__)
+
+def get_embedding_model():
+    """
+    Load the SentenceTransformer model from the package's embedding_model folder
+    
+    Returns:
+    SentenceTransformer: The loaded model
+    """
+    try:
+        # Get the path to the embedding_model directory in the package
+        model_path = pkg_resources.resource_filename('geneinsight', 'embedding_model')
+        
+        # Verify the model directory exists
+        if not os.path.exists(model_path):
+            logger.warning(f"Embedding model directory not found at {model_path}")
+            logger.info("Falling back to online model...")
+            return SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        
+        logger.info(f"Loading embedding model from {model_path}")
+        
+        # Load the model from the package directory
+        model = SentenceTransformer(model_path)
+        
+        return model
+    except Exception as e:
+        logger.error(f"Error loading embedding model: {e}")
+        logger.info("Falling back to online model...")
+        return SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
 class HypergeometricGSEA:
     """
@@ -117,16 +146,25 @@ class RAGModuleGSEAPY:
     A class that orchestrates GSEA and retrieves top documents based on a query embedding.
     GSEA is run when get_top_documents is called.
     """
-    def __init__(self, ontology_object_list):
+    def __init__(self, ontology_object_list, use_local_model=True):
         """
         Parameters
         ----------
         ontology_object_list : list
             A list of OntologyReader objects.
+        use_local_model : bool, optional (default=True)
+            Whether to use the locally packaged model instead of downloading.
         """
         self.ontologies = ontology_object_list
         logger.info(f"Initializing RAGModuleGSEAPY with {len(ontology_object_list)} ontologies.")
-        self.embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        
+        if use_local_model:
+            logger.info("Using locally packaged SentenceTransformer model")
+            self.embedder = get_embedding_model()
+        else:
+            logger.info("Using online SentenceTransformer model")
+            self.embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+            
         self.hypergeometric_gsea_obj = None
         self.enrichr_results = None
 
@@ -323,6 +361,7 @@ def main():
     parser.add_argument("--fdr_threshold", type=float, default=0.1, help="FDR threshold for filtering results.")
     parser.add_argument("--ontology_folder", required=True, help="Path to the folder containing ontology files.")
     parser.add_argument("--filter_csv", required=True, help="Path to the CSV file used to filter queries.")
+    parser.add_argument("--use_external_model", action="store_true", help="Use external model instead of locally packaged model.")
     args = parser.parse_args()
 
     logger.info("Starting main script.")
@@ -355,7 +394,9 @@ def main():
         sys.exit(1)
 
     # Instantiate the GSEA module with all loaded ontologies
-    rag_module = RAGModuleGSEAPY(ontologies)
+    # Use local model by default, or external if specified
+    use_local_model = not args.use_external_model
+    rag_module = RAGModuleGSEAPY(ontologies, use_local_model=use_local_model)
 
     logger.info(f"Reading summary CSV: {args.summary_csv}")
     filter_df = pd.read_csv(args.filter_csv)

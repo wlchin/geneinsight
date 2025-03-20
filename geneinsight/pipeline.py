@@ -5,7 +5,7 @@ import tempfile
 import shutil
 from pathlib import Path
 import pandas as pd
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 # Rich for stage announcements
 from rich.console import Console
@@ -29,8 +29,9 @@ class Pipeline:
         api_base_url: Optional[str] = None,
         target_filtered_topics: int = 25,
         species: int = 9606,
-        filtered_n_samples: int = 10,  # new parameter for filtered sets topic modeling
-        api_temperature: float = 0.2    # new temperature parameter
+        filtered_n_samples: int = 10,  # parameter for filtered sets topic modeling
+        api_temperature: float = 0.2,   # temperature parameter
+        call_ncbi_api: bool = True      # whether to call NCBI API for gene summaries
     ):
         self.output_dir = os.path.abspath(output_dir)
 
@@ -56,6 +57,7 @@ class Pipeline:
         self.species = species  # Save species as an instance variable
         self.filtered_n_samples = filtered_n_samples  # store new parameter
         self.api_temperature = api_temperature  # store temperature parameter
+        self.call_ncbi_api = call_ncbi_api  # store NCBI API control parameter
 
         # Create directories
         os.makedirs(self.output_dir, exist_ok=True)
@@ -88,6 +90,7 @@ class Pipeline:
 
         logger.debug(f"Pipeline initialized with output directory: {self.output_dir}")
         logger.debug(f"Using temporary directory: {self.temp_dir}")
+        logger.debug(f"Species: {self.species}, NCBI API calls: {'enabled' if self.call_ncbi_api else 'disabled'}")
 
     def run(
         self,
@@ -130,6 +133,14 @@ class Pipeline:
             # Step 1: Gene enrichment from StringDB
             self.console.rule("[bold cyan]Step 1: Retrieving gene enrichment data from StringDB[/bold cyan]")
             enrichment_df, documents_df = self._get_stringdb_enrichment(query_gene_set)
+            
+            # Check if enrichment or documents are empty
+            if enrichment_df.empty or documents_df.empty:
+                logger.error("No enrichment or documents returned from StringDB. Aborting pipeline.")
+                self.console.print("[bold red]ERROR: No enrichment or documents returned from StringDB. Aborting pipeline.[/bold red]")
+                raise ValueError("No enrichment or documents returned from StringDB. Pipeline aborted.")
+                
+            self.console.print(f"Retrieved {len(enrichment_df)} enriched terms and {len(documents_df)} documents from StringDB.")
             self.console.print("[bold green]Done! Step 1 completed.[/bold green]")
 
             # Step 2: Topic modeling
@@ -349,7 +360,7 @@ class Pipeline:
         except Exception as e:
             logger.error(f"Error zipping results folders: {e}", exc_info=True)
 
-    def _get_stringdb_enrichment(self, query_gene_set: str) -> tuple:
+    def _get_stringdb_enrichment(self, query_gene_set: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Get gene enrichment data from StringDB."""
         from .enrichment.stringdb import process_gene_enrichment
         enrichment_output = os.path.join(self.dirs["enrichment"], "enrichment.csv")
@@ -526,6 +537,11 @@ class Pipeline:
             logger.error(f"Failed to import geneinsight.reports.pipeline: {e}")
             return None
 
+        # Convert numeric species ID to string taxonomy ID format for NCBI
+        taxonomy_id = str(self.species)
+        logger.info(f"Generating report for taxonomy ID: {taxonomy_id}")
+        logger.info(f"NCBI API calls: {'enabled' if self.call_ncbi_api else 'disabled'}")
+
         status, html_index = reports_pipeline.run_pipeline(
             input_folder=output_path,
             output_folder=report_out_dir,
@@ -533,7 +549,9 @@ class Pipeline:
             context_service=self.api_service,
             context_api_key=None,
             context_model=self.api_model,
-            context_base_url=self.api_base_url
+            context_base_url=self.api_base_url,
+            taxonomy_id=taxonomy_id,      # Pass the taxonomy ID to the report pipeline
+            call_ncbi_api=self.call_ncbi_api  # Use the class parameter for NCBI API calls
         )
         if status and html_index:
             logger.info(f"Report generated successfully at {html_index}")
@@ -563,6 +581,7 @@ class Pipeline:
             "api_service": self.api_service,
             "api_model": self.api_model,
             "species": self.species,
+            "call_ncbi_api": self.call_ncbi_api,  # Include NCBI API setting in metadata
         }
 
         metadata_path = os.path.join(run_dir, "metadata.csv")
@@ -571,31 +590,31 @@ class Pipeline:
         return run_dir
 
     def _perform_ontology_enrichment(self, summary_df: pd.DataFrame,
-                                     clustered_df: pd.DataFrame,
-                                     query_gene_set: str,
-                                     background_gene_list: str) -> pd.DataFrame:
-        """
-        Perform ontology enrichment analysis using the ontology workflow.
-        """
-        logger.info("Running ontology enrichment analysis")
-        ontology_folder = os.path.join(os.path.dirname(__file__), "ontology", "ontology_folders")
-        from .ontology.workflow import OntologyWorkflow
-        workflow = OntologyWorkflow(
-            ontology_folder=ontology_folder,
-            fdr_threshold=self.pvalue_threshold,
-            use_temp_files=False
-        )
-        ontology_output_dir = os.path.join(self.dirs["final"], "ontology")
-        os.makedirs(ontology_output_dir, exist_ok=True)
-        enrichment_df, ontology_dict_df = workflow.process_dataframes(
-            summary_df=summary_df,
-            clustered_df=clustered_df,
-            gene_list_path=query_gene_set,
-            background_genes_path=background_gene_list,
-            output_dir=ontology_output_dir
-        )
-        logger.info(f"Ontology enrichment complete. Found {len(ontology_dict_df)} ontology dictionaries.")
-        return ontology_dict_df
+                                        clustered_df: pd.DataFrame,
+                                        query_gene_set: str,
+                                        background_gene_list: str) -> pd.DataFrame:
+            """
+            Perform ontology enrichment analysis using the ontology workflow.
+            """
+            logger.info("Running ontology enrichment analysis")
+            ontology_folder = os.path.join(os.path.dirname(__file__), "ontology", "ontology_folders")
+            from .ontology.workflow import OntologyWorkflow
+            workflow = OntologyWorkflow(
+                ontology_folder=ontology_folder,
+                fdr_threshold=self.pvalue_threshold,
+                use_temp_files=False
+            )
+            ontology_output_dir = os.path.join(self.dirs["final"], "ontology")
+            os.makedirs(ontology_output_dir, exist_ok=True)
+            enrichment_df, ontology_dict_df = workflow.process_dataframes(
+                summary_df=summary_df,
+                clustered_df=clustered_df,
+                gene_list_path=query_gene_set,
+                background_genes_path=background_gene_list,
+                output_dir=ontology_output_dir
+            )
+            logger.info(f"Ontology enrichment complete. Found {len(ontology_dict_df)} ontology dictionaries.")
+            return ontology_dict_df
 
 
 if __name__ == "__main__":
@@ -619,6 +638,7 @@ if __name__ == "__main__":
     parser.add_argument("--filtered_n_samples", type=int, default=10, help="Number of topic models to run on filtered sets.")
     parser.add_argument("--api_temperature", type=float, default=0.2,
                         help="Sampling temperature for API calls (default: 0.2).")
+    parser.add_argument("--no-ncbi-api", action="store_true", help="Disable NCBI API calls for gene summaries.")
     parser.add_argument("-v", "--verbosity",
                         default="info",
                         choices=["none", "debug", "info", "warning", "error", "critical"],
@@ -654,7 +674,8 @@ if __name__ == "__main__":
         target_filtered_topics=args.target_filtered_topics,
         species=args.species,
         filtered_n_samples=args.filtered_n_samples,
-        api_temperature=args.api_temperature  # pass temperature parameter
+        api_temperature=args.api_temperature,  # pass temperature parameter
+        call_ncbi_api=not args.no_ncbi_api     # Toggle NCBI API calls based on command-line arg
     )
 
     pipeline.run(

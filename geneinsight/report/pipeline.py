@@ -64,7 +64,10 @@ def run_pipeline(
     context_service="openai", 
     context_api_key=None, 
     context_model="gpt-4o-mini", 
-    context_base_url=None
+    context_base_url=None,
+    # New parameter for species support
+    taxonomy_id="9606",
+    call_ncbi_api=True
 ):
     """
     Run the complete GeneInsight pipeline.
@@ -77,10 +80,13 @@ def run_pipeline(
         context_api_key (str): API key for the chosen service.
         context_model (str): Model to use for generation.
         context_base_url (str): Base URL for the API (if needed, e.g. for ollama).
+        taxonomy_id (str): NCBI taxonomy ID (e.g., "9606" for human, "10090" for mouse).
+        call_ncbi_api (bool): Whether to call the NCBI API for gene summaries.
     """
     start_time = time.time()
     logging.info(f"Starting GeneInsight pipeline for gene set: {gene_set}")
     logging.info(f"Using context generation service: {context_service}")
+    logging.info(f"Using taxonomy ID: {taxonomy_id}")
     
     # Define file paths
     paths = {
@@ -153,13 +159,15 @@ def run_pipeline(
             output_path=paths["summary_json"]
         )
         
-        # Step 5: Generate RST files
+        # Step 5: Generate RST files with taxonomy ID
         generate_rst_files(
             headings_path=paths["headings"],
             merged_path=paths["merged"],
             filtered_sets_path=paths["filtered_sets"],
             output_dir=paths["rst_folder"],
-            csv_folder=paths["csv_folder"]
+            csv_folder=paths["csv_folder"],
+            taxonomy_id=taxonomy_id,     # Add taxonomy ID parameter
+            call_ncbi_api=call_ncbi_api  # Add NCBI API control parameter
         )
         
         generate_summary_page(

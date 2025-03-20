@@ -87,6 +87,12 @@ geneinsight query_genes.txt background_genes.txt \
   --api_service ollama \
   --api_model llama3.1:8b \
   --api_base_url "http://localhost:11434/v1"
+
+# Using a different species (mouse)
+geneinsight query_genes.txt background_genes.txt --species 10090
+
+# Enable NCBI API calls for gene summaries
+geneinsight query_genes.txt background_genes.txt --enable-ncbi-api
 ```
 
 ### Available Options
@@ -98,7 +104,7 @@ usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
                    [--api_parallel_jobs API_PARALLEL_JOBS] [--api_base_url API_BASE_URL]
                    [--target_filtered_topics TARGET_FILTERED_TOPICS] [--temp_dir TEMP_DIR]
                    [--report_title REPORT_TITLE] [--species SPECIES]
-                   [--filtered_n_samples FILTERED_N_SAMPLES]
+                   [--filtered_n_samples FILTERED_N_SAMPLES] [--enable-ncbi-api]
                    [-v {none,debug,info,warning,error,critical}]
                    query_gene_set background_gene_list
 ```
@@ -120,9 +126,36 @@ usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
 | `--target_filtered_topics` | Target number of topics after filtering           | 25       |
 | `--temp_dir`            | Temporary directory for intermediate files             | None     |
 | `--report_title`        | Title for the generated report                         | None     |
-| `--species`             | Species identifier (9606 for human)                    | 9606     |
+| `--species`             | Species identifier (NCBI taxonomy ID)                  | 9606     |
+| `--enable-ncbi-api`     | Enable NCBI API calls for gene summaries               | False    |
 | `-v`, `--verbosity`      | Set logging verbosity                                  | none     |
 | `--api_temperature`     | Sampling temperature for API calls                     | 0.2      |
+
+### Multi-Species Support
+
+Geneinsight supports different species through NCBI taxonomy IDs. Common species IDs:
+
+| Species               | Taxonomy ID |
+|-----------------------|-------------|
+| Human                 | 9606        |
+| Mouse                 | 10090       |
+| Rat                   | 10116       |
+| Zebrafish             | 7955        |
+| Fruit Fly             | 7227        |
+| C. elegans            | 6239        |
+| Yeast                 | 4932        |
+
+The `--species` parameter accepts any valid NCBI taxonomy ID, allowing analysis of gene sets from virtually any organism.
+
+### Gene Summary Options
+
+By default, NCBI API calls for gene summaries are disabled to improve performance and avoid rate limiting. To enable detailed gene summaries with tooltips in the generated report, use the `--enable-ncbi-api` flag:
+
+```bash
+geneinsight query_genes.txt background_genes.txt --enable-ncbi-api
+```
+
+This will fetch gene descriptions from NCBI and include them in the report, but may slow down the processing.
 
 ## API Support
 

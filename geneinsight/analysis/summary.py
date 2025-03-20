@@ -1,6 +1,7 @@
 import argparse
 import pandas as pd
 import os
+import pkg_resources
 from tqdm import tqdm
 import logging
 import json
@@ -20,12 +21,54 @@ logger = logging.getLogger(__name__)
 # Load the .env file
 load_dotenv()
 
+def get_embedding_model():
+    """
+    Load the SentenceTransformer model from the package's embedding_model folder
+    
+    Returns:
+    SentenceTransformer: The loaded model
+    """
+    try:
+        # Get the path to the embedding_model directory in the package
+        model_path = pkg_resources.resource_filename('geneinsight', 'embedding_model')
+        
+        # Verify the model directory exists
+        if not os.path.exists(model_path):
+            logger.warning(f"Embedding model directory not found at {model_path}")
+            logger.info("Falling back to online model...")
+            return SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        
+        logger.info(f"Loading embedding model from {model_path}")
+        
+        # Load the model from the package directory
+        model = SentenceTransformer(model_path)
+        
+        return model
+    except Exception as e:
+        logger.error(f"Error loading embedding model: {e}")
+        logger.info("Falling back to online model...")
+        return SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+
 class RAGModule:
-    def __init__(self, df, embeddings=None):
+    def __init__(self, df, embeddings=None, use_local_model=True):
+        """
+        Initialize the RAG Module.
+        
+        Args:
+            df: DataFrame containing documents with a 'description' column
+            embeddings: Pre-computed embeddings (optional)
+            use_local_model: Whether to use the locally packaged model (default: True)
+        """
         logging.info("Initializing RAGModule...")
         self.documents = df["description"].to_list()
         self.df_metadata = df
-        self.embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+        
+        if use_local_model:
+            logging.info("Using locally packaged sentence transformer model")
+            self.embedder = get_embedding_model()
+        else:
+            logging.info("Using online sentence transformer model")
+            self.embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
         if embeddings is not None:
             logging.info("Using provided document embeddings.")
@@ -196,17 +239,22 @@ class RAGModule:
         return "\n".join(md_lines)
 
 def read_input_files(enrichment_csv: str, minor_topics_csv: str):
+    logging.info(f"Reading input files: {enrichment_csv} and {minor_topics_csv}")
     df = pd.read_csv(enrichment_csv)
     topics = pd.read_csv(minor_topics_csv)
+    logging.info(f"Loaded {len(df)} records from enrichment CSV and {len(topics)} records from topics CSV")
     return df, topics
 
-def initialize_rag_module(df: pd.DataFrame) -> RAGModule:
-    x_together = RAGModule(df)
+def initialize_rag_module(df: pd.DataFrame, use_local_model: bool = True) -> RAGModule:
+    logging.info("Initializing RAG module...")
+    x_together = RAGModule(df, use_local_model=use_local_model)
     return x_together
 
 def get_topics_of_interest(topics_df: pd.DataFrame) -> list:
+    logging.info("Getting topics of interest...")
     topics_df = topics_df[topics_df["prompt_type"]=="subtopic_BERT"]
     topics_of_interest = topics_df["generated_result"].tolist()
+    logging.info(f"Found {len(topics_of_interest)} topics of interest")
     return topics_of_interest
 
 def generate_results(
@@ -214,20 +262,28 @@ def generate_results(
     topics_of_interest: list,
     num_results: int = 5
 ) -> pd.DataFrame:
+    logging.info(f"Generating results for {len(topics_of_interest)} topics...")
     results = []
     for topic in tqdm(topics_of_interest, desc="Processing topics"):
         results_df = x_together.get_summary_to_query_df(topic, num_results=num_results)
         results.append(results_df)
     final_df = pd.concat(results, ignore_index=True)
+    logging.info(f"Results generated, final DataFrame shape: {final_df.shape}")
     return final_df
 
 def save_results(final_df: pd.DataFrame, output_csv: str):
+    logging.info(f"Saving results to {output_csv}")
+    # Create output directory if it doesn't exist
+    os.makedirs(os.path.dirname(output_csv), exist_ok=True)
     final_df.to_csv(output_csv, index=False)
-    print(f"Results saved to {output_csv}")
+    logging.info(f"Results saved to {output_csv}")
 
 def main(args):
     df, topics = read_input_files(args.enrichment_csv, args.minor_topics_csv)
-    x_together = initialize_rag_module(df)
+    
+    # Initialize RAG module with specified model preference
+    x_together = initialize_rag_module(df, use_local_model=not args.use_external_model)
+    
     topics_of_interest = get_topics_of_interest(topics)
     final_df = generate_results(
         x_together,
@@ -262,12 +318,17 @@ if __name__ == "__main__":
         default=5,
         help="Number of results to retrieve for each query."
     )
+    parser.add_argument(
+        "--use_external_model",
+        action="store_true",
+        help="Use external model instead of locally packaged model."
+    )
 
     args = parser.parse_args()
     main(args)
 
-# New: Define create_summary to generate a summary from API results and enrichment data.
-def create_summary(api_results_df, enrichment_df, summary_output=None):
+# Function to create a summary from API results and enrichment data.
+def create_summary(api_results_df, enrichment_df, summary_output=None, use_local_model=True):
     """
     Create a summary DataFrame using API results and enrichment data.
     
@@ -276,6 +337,7 @@ def create_summary(api_results_df, enrichment_df, summary_output=None):
                         or a 'generated_result' column.
         enrichment_df: pandas DataFrame containing enrichment data for initializing RAGModule.
         summary_output: Optional path to output the summary CSV file.
+        use_local_model: Whether to use the locally packaged model (default: True)
     
     Returns:
         summary_df: pandas DataFrame containing summary information for each query.
@@ -288,9 +350,11 @@ def create_summary(api_results_df, enrichment_df, summary_output=None):
             raise ValueError("API results DataFrame must contain a 'query' column or a 'generated_result' column.")
     
     # Initialize RAGModule with the enrichment DataFrame
-    rag_module = RAGModule(enrichment_df)
+    logging.info("Initializing RAGModule for summary creation...")
+    rag_module = RAGModule(enrichment_df, use_local_model=use_local_model)
     
     summary_frames = []
+    logging.info(f"Processing {len(api_results_df['query'].unique())} unique queries for summary...")
     # Process each unique query in the API results
     for query in api_results_df["query"].unique():
         df_summary = rag_module.get_summary_to_query_df(query)
@@ -298,9 +362,14 @@ def create_summary(api_results_df, enrichment_df, summary_output=None):
     
     # Combine all individual query summaries into one DataFrame.
     summary_df = pd.concat(summary_frames, ignore_index=True)
+    logging.info(f"Summary created with shape: {summary_df.shape}")
     
     # Optionally save the summary to a CSV file if a path is provided.
     if summary_output:
+        logging.info(f"Saving summary to {summary_output}")
+        # Create output directory if it doesn't exist
+        os.makedirs(os.path.dirname(summary_output), exist_ok=True)
         summary_df.to_csv(summary_output, index=False)
+        logging.info(f"Summary saved to {summary_output}")
     
     return summary_df

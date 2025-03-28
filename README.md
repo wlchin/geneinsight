@@ -4,7 +4,23 @@
 ![Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 
-A Python package for topic modeling of gene sets with enrichment analysis. 
+A Python package for topic modeling of gene sets with enrichment analysis.
+
+## Table of Contents
+- [Overview](#overview)
+- [Installation](#installation)
+  - [Quick Installation](#quick-installation)
+  - [Installation with Virtual Environment](#installation-with-virtual-environment-recommended)
+- [Command Line Interface](#command-line-interface)
+  - [Available Options](#available-options)
+  - [Multi-Species Support](#multi-species-support)
+  - [Gene Summary Options](#gene-summary-options)
+- [API Support](#api-support)
+- [Environment Variables](#environment-variables)
+- [Output Format](#output-format)
+- [Interactive Report](#interactive-report)
+- [Examples](#examples)
+- [License](#license)
 
 ## Overview
 
@@ -143,7 +159,6 @@ Geneinsight supports different species through NCBI taxonomy IDs. Common species
 | Zebrafish             | 7955        |
 | Fruit Fly             | 7227        |
 | C. elegans            | 6239        |
-| Yeast                 | 4932        |
 
 The `--species` parameter accepts any valid NCBI taxonomy ID, allowing analysis of gene sets from virtually any organism.
 
@@ -201,8 +216,6 @@ By default, Geneinsight generates an interactive HTML report visualizing the res
 3. **Gene Set Visualizations** - Heatmaps showing gene presence across references
 4. **Summary Statistics** - Key metrics about the analysis
 5. **Download Interface** - Interactive interface to download specific themes
-
-To customize the report, use the `--report_title` parameter.
 
 ## Examples
 

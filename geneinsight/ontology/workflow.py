@@ -436,7 +436,7 @@ class OntologyWorkflow:
         if gene_origin is None:
             gene_origin = f"data/{gene_set}.txt"
         if background_genes is None:
-            background_genes = "data/Patient_Day24-BackgroundList.txt"
+            background_genes = "data/BackgroundList.txt"
         if filter_csv is None:
             filter_csv = f"{output_dir}/clustered_topics/{gene_set}_clustered_topics.csv"
             

@@ -30,6 +30,19 @@ class HypergeometricGSEA:
             genelist: List of genes to test
             background_list: Background gene population (optional)
         """
+        if background_list is not None and genelist:
+            first_gene = genelist[0]
+            if first_gene.isupper():
+                background_list = [g.upper() for g in background_list]
+            elif first_gene.islower():
+                background_list = [g.lower() for g in background_list]
+            elif first_gene.istitle():
+                background_list = [g.title() for g in background_list]
+
+            intersect = set(genelist).intersection(set(background_list))
+            if not intersect:
+                logger.warning("No intersection found between genelist and background_list.")
+
         self.genelist = genelist
         self.background_list = background_list
     
@@ -52,8 +65,27 @@ class HypergeometricGSEA:
             logger.warning("No gene sets provided for GSEA analysis.")
             return pd.DataFrame()
         
+        if self.genelist:
+            first_gene = self.genelist[0]
+            if first_gene.isupper():
+                for k, v in geneset_dict.items():
+                    geneset_dict[k] = [g.upper() for g in v]
+            elif first_gene.islower():
+                for k, v in geneset_dict.items():
+                    geneset_dict[k] = [g.lower() for g in v]
+            elif first_gene.istitle():
+                for k, v in geneset_dict.items():
+                    geneset_dict[k] = [g.title() for g in v]
+
+            all_genes = set()
+            for genes in geneset_dict.values():
+                all_genes.update(genes)
+            if not set(self.genelist).intersection(all_genes):
+                logger.warning("No intersection found between genelist and geneset_dict.")
+
         logger.info(f"Performing hypergeometric GSEA with {len(geneset_dict)} gene sets")
-        
+        # print out geneset_dict
+        logger.debug(f"Gene set dictionary: {geneset_dict}")
         try:
             enr = gp.enrich(
                 gene_list=self.genelist,

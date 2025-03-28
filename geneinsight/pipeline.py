@@ -123,7 +123,7 @@ class Pipeline:
 
         overlap = query_genes.intersection(background_genes)
         if not overlap:
-            logger.error("No common items between query gene set and background. Aborting pipeline.")
+            self.console.print("No common items between query gene set and background. Aborting pipeline.")
             raise ValueError("No overlap found between query gene set and background. Pipeline aborted.")
         else:
             self.console.print(f"Found {len(overlap)} overlapping genes between query and background.")

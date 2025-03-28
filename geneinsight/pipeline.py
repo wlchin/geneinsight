@@ -259,7 +259,8 @@ class Pipeline:
 
             self.console.print("[bold green]Pipeline completed successfully![/bold green]")
             self.console.print(f"Results available at: [bold]{output_path + '.zip'}[/bold]")
-            self.console.print(f"Report available at: [bold]{self.dirs['sphinx_builds']+ '.zip'}[/bold]")
+            if generate_report:
+                self.console.print(f"Report available at: [bold]{self.dirs['sphinx_builds']+ '.zip'}[/bold]")
             logger.info(f"Pipeline completed successfully. Results available at: {self.dirs['final']}")
             return self.dirs["final"]
 

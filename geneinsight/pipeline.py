@@ -118,6 +118,8 @@ class Pipeline:
             query_genes = set(pd.read_csv(query_gene_set, header=None)[0].unique())
             background_genes = set(pd.read_csv(background_gene_list, header=None)[0].unique())
         except Exception as e:
+            self.console.print("No common items between query gene set and background. Aborting pipeline.")
+            self.console.print(f"[bold red]ERROR: Failed to read gene files: {e}[/bold red]")
             logger.error(f"Failed to read gene files: {e}")
             raise
 

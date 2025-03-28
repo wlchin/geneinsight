@@ -60,6 +60,21 @@ class HypergeometricGSEA:
         background_list : list
             The background gene population.
         """
+        if background_list is not None and genelist:
+            # Detect genelist case from the first entry
+            first_gene = genelist[0]
+            if first_gene.isupper():
+                background_list = [g.upper() for g in background_list]
+            elif first_gene.islower():
+                background_list = [g.lower() for g in background_list]
+            elif first_gene.istitle():
+                background_list = [g.title() for g in background_list]
+
+            # Check intersection
+            intersect = set(genelist).intersection(set(background_list))
+            if not intersect:
+                logger.warning("No intersection found between genelist and background_list.")
+        
         self.genelist = genelist
         self.background_list = background_list
         logger.debug(

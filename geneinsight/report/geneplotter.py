@@ -107,6 +107,15 @@ class Geneplotter:
         """
         from sklearn.preprocessing import MultiLabelBinarizer
         
+        row_count = len(ref_sets) + len(ontology_sets)
+        if row_count == 0:
+            fig, ax = plt.subplots(figsize=(8, 2))
+            ax.text(0.5, 0.5, "No significant terms noted", ha="center", va="center")
+            ax.axis("off")
+            plt.savefig(savename)
+            plt.close()
+            return
+        
         subsets = [query_set] + ref_sets + ontology_sets
 
         mlb = MultiLabelBinarizer()

@@ -97,6 +97,24 @@ class HypergeometricGSEA:
             A DataFrame with GSEA results.
         """
         logger.debug("Starting hypergeometric GSEA using gseapy.enrich()")
+        if self.genelist:
+            first_gene = self.genelist[0]
+            if first_gene.isupper():
+                for k, v in geneset_dict.items():
+                    geneset_dict[k] = [g.upper() for g in v]
+            elif first_gene.islower():
+                for k, v in geneset_dict.items():
+                    geneset_dict[k] = [g.lower() for g in v]
+            elif first_gene.istitle():
+                for k, v in geneset_dict.items():
+                    geneset_dict[k] = [g.title() for g in v]
+
+            all_genes = set()
+            for genes in geneset_dict.values():
+                all_genes.update(genes)
+            if not set(self.genelist).intersection(all_genes):
+                logger.warning("No intersection found between genelist and geneset_dict.")
+
         enr = gp.enrich(
             gene_list=self.genelist,
             gene_sets=geneset_dict,

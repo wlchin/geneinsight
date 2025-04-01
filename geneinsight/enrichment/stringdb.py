@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Module for querying the StringDB API for gene enrichment, with a user-specifiable species.
+Module for querying the StringDB API for gene enrichment, with a user-specifiable species - stringdb.py
 """
 
 import argparse

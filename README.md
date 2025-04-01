@@ -15,6 +15,7 @@ A Python package for topic modeling of gene sets with enrichment analysis.
   - [Available Options](#available-options)
   - [Multi-Species Support](#multi-species-support)
   - [Gene Summary Options](#gene-summary-options)
+  - [StringDB Options](#stringdb-options)
 - [API Support](#api-support)
 - [Environment Variables](#environment-variables)
 - [Output Format](#output-format)
@@ -109,6 +110,9 @@ geneinsight query_genes.txt background_genes.txt --species 10090
 
 # Enable NCBI API calls for gene summaries
 geneinsight query_genes.txt background_genes.txt --enable-ncbi-api
+
+# Using local StringDB module instead of API
+geneinsight query_genes.txt background_genes.txt --use-local-stringdb
 ```
 
 ### Available Options
@@ -121,7 +125,7 @@ usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
                    [--target_filtered_topics TARGET_FILTERED_TOPICS] [--temp_dir TEMP_DIR]
                    [--report_title REPORT_TITLE] [--species SPECIES]
                    [--filtered_n_samples FILTERED_N_SAMPLES] [--enable-ncbi-api]
-                   [-v {none,debug,info,warning,error,critical}]
+                   [--use-local-stringdb] [-v {none,debug,info,warning,error,critical}]
                    query_gene_set background_gene_list
 ```
 
@@ -144,6 +148,7 @@ usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
 | `--report_title`        | Title for the generated report                         | None     |
 | `--species`             | Species identifier (NCBI taxonomy ID)                  | 9606     |
 | `--enable-ncbi-api`     | Enable NCBI API calls for gene summaries               | False    |
+| `--use-local-stringdb`  | Use local StringDB module instead of API               | False    |
 | `-v`, `--verbosity`      | Set logging verbosity                                  | none     |
 | `--api_temperature`     | Sampling temperature for API calls                     | 0.2      |
 
@@ -171,6 +176,29 @@ geneinsight query_genes.txt background_genes.txt --enable-ncbi-api
 ```
 
 This will fetch gene descriptions from NCBI and include them in the report, but may slow down the processing.
+
+### StringDB Options
+
+Geneinsight offers two methods for retrieving gene enrichment data from StringDB:
+
+1. **StringDB API** (default): Queries the StringDB web API for gene enrichment data
+   - Provides real-time access to the latest StringDB data
+   - Requires an internet connection
+   - May be slower due to network requests and rate limiting
+
+2. **Local StringDB Module**: Uses a local cache of StringDB data
+   - Significantly faster for large gene sets
+   - Works offline after initial cache download
+   - Currently supports human (9606) and mouse (10090) species
+   - Cache files are automatically downloaded on first use
+
+To use the local StringDB module instead of the API:
+
+```bash
+geneinsight query_genes.txt background_genes.txt --use-local-stringdb
+```
+
+The local mode is particularly useful for batch processing of multiple gene sets or when working with limited internet connectivity.
 
 ## API Support
 

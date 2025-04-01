@@ -116,23 +116,34 @@ class RAGModule:
     def format_references_and_genes(self, indices):
         logging.info("Entering format_references_and_genes() with indices=%s", indices.tolist())
         df = self.df_metadata.iloc[indices].reset_index(drop=True)
-        grouped = (
-            df.groupby(["term", "description"])["inputGenes"]
-            .apply(lambda x: ",".join(x))
-            .reset_index()
-        )
         
-        references = []
-        all_genes_list = []
-        for _, row in grouped.iterrows():
-            genes = [g.strip() for g in row["inputGenes"].split(",") if g.strip()]
-            references.append({
-                "term": row["term"],
-                "description": row["description"],
-                "genes": genes
-            })
-            all_genes_list.extend(genes)
-        
+        if "inputGenes" in df.columns:
+            gene_column = "inputGenes"
+        elif "preferred_names" in df.columns:
+            gene_column = "preferred_names"
+        else:
+            gene_column = None
+
+        if gene_column:
+            grouped = (
+                df.groupby(["term", "description"])[gene_column]
+                .apply(lambda x: ",".join(x))
+                .reset_index()
+            )
+            references = []
+            all_genes_list = []
+            for _, row in grouped.iterrows():
+                genes = [g.strip() for g in row[gene_column].split(",") if g.strip()]
+                references.append({
+                    "term": row["term"],
+                    "description": row["description"],
+                    "genes": genes
+                })
+                all_genes_list.extend(genes)
+        else:
+            references = []
+            all_genes_list = []
+
         gene_counter = Counter(all_genes_list)
         unique_genes = dict(gene_counter)
         logging.info("References and unique genes formatted.")

@@ -52,6 +52,9 @@ def main():
     # Changed from --no-ncbi-api to --enable-ncbi-api to make disabled the default
     parser.add_argument("--enable-ncbi-api", action="store_true",
                         help="Enable NCBI API calls for gene summaries (disabled by default).")
+    # New argument for using local StringDB instead of API
+    parser.add_argument("--use-local-stringdb", action="store_true",
+                        help="Use local StringDB module instead of API (API is default).")
     # Argument for controlling verbosity
     parser.add_argument("-v", "--verbosity",
                         default="none",
@@ -92,6 +95,7 @@ def main():
     species_name = species_names.get(args.species, f"Species ID {args.species}")
     logger.info(f"Using species: {species_name} (taxonomy ID: {args.species})")
     logger.info(f"NCBI API calls: {'enabled' if args.enable_ncbi_api else 'disabled'}")
+    logger.info(f"StringDB mode: {'local' if args.use_local_stringdb else 'API'}")
 
     pipeline = Pipeline(
         output_dir=args.output_dir,
@@ -107,7 +111,8 @@ def main():
         species=args.species,
         filtered_n_samples=args.filtered_n_samples,
         api_temperature=args.api_temperature,  # pass temperature parameter
-        call_ncbi_api=args.enable_ncbi_api     # NCBI API calls disabled by default, enabled with flag
+        call_ncbi_api=args.enable_ncbi_api,    # NCBI API calls disabled by default, enabled with flag
+        use_local_stringdb=args.use_local_stringdb  # Use local StringDB module if flag is set
     )
 
     try:

@@ -368,9 +368,9 @@ class Pipeline:
 
     def _get_stringdb_enrichment(self, query_gene_set: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """Get gene enrichment data from StringDB using either API or local module."""
-        if self.use_local_stringdb:
+        if self.species in [9606, 10090] and self.use_local_stringdb:
             from .enrichment.stringdb_local import process_gene_enrichment
-            self.console.print("[bold]Using local StringDB module for gene enrichment[/bold]")
+            self.console.print("[bold]Using local StringDB module for gene enrichment (9606 or 10090)[/bold]")
             
             enrichment_output = os.path.join(self.dirs["enrichment"], "enrichment.csv")
             documents_output = os.path.join(self.dirs["enrichment"], "documents.csv")

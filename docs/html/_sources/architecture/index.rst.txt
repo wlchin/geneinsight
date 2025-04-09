@@ -1,0 +1,10 @@
+System Architecture
+===================
+
+This section covers the technical design and implementation of GeneInsight.
+
+.. toctree::
+   :maxdepth: 2
+
+   workflow
+   components

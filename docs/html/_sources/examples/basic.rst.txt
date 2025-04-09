@@ -1,0 +1,70 @@
+Basic Examples
+==============
+
+This page provides basic examples of using GeneInsight for gene set analysis.
+
+Example 1: Human Gene Set Analysis
+--------------------------------
+
+This example demonstrates the basic workflow for analyzing a human gene set.
+
+Input Preparation
+^^^^^^^^^^^^^^^
+
+Save your gene list in a text file with one gene per line:
+
+.. code-block:: text
+    :caption: genes_of_interest.txt
+
+    BRCA1
+    BRCA2
+    TP53
+    ATM
+    CHEK2
+    PALB2
+    RAD51
+    BARD1
+
+Similarly, prepare a background gene list:
+
+.. code-block:: text
+    :caption: background_genes.txt
+
+    # This file contains a larger set of genes for statistical comparison
+    # Format: one gene per line
+    BRCA1
+    BRCA2
+    TP53
+    ATM
+    CHEK2
+    PALB2
+    RAD51
+    BARD1
+    # ...many more genes...
+
+Running the Analysis
+^^^^^^^^^^^^^^^^^
+
+Execute GeneInsight with default parameters:
+
+.. code-block:: bash
+
+    geneinsight genes_of_interest.txt background_genes.txt -o ./dna_repair_analysis
+
+This will:
+
+1. Retrieve functional annotations from the STRING database
+2. Perform topic modeling to identify biological themes
+3. Apply statistical validation through hypergeometric testing
+4. Generate an interactive HTML report
+
+Exploring the Results
+^^^^^^^^^^^^^^^^^
+
+Navigate to the output directory and open the HTML report:
+
+.. code-block:: bash
+
+    cd dna_repair_analysis
+    # Open unzip sphinx_build.zip and open index.html in your browser
+

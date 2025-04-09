@@ -1,0 +1,11 @@
+Theoretical Background
+====================
+
+This section covers the theoretical foundation and concepts behind GeneInsight.
+
+.. toctree::
+   :maxdepth: 2
+
+   overview
+   topic_modeling
+   enrichment

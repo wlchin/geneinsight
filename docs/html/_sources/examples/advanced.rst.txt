@@ -1,0 +1,141 @@
+Advanced Usage Examples
+=======================
+
+This page provides examples of advanced GeneInsight usage scenarios.
+
+Example 1: Custom API Configuration
+---------------------------------
+
+This example demonstrates using GeneInsight with custom API parameters.
+
+Using OpenAI with Advanced Parameters
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For more exploratory analysis with diverse outputs:
+
+.. code-block:: bash
+
+    geneinsight query_genes.txt background_genes.txt \
+      --api_service openai \
+      --api_model gpt-4 \
+      --api_temperature 0.7 \
+      --api_parallel_jobs 4 \
+      --n_samples 10 \
+      --target_filtered_topics 50
+
+This configuration:
+
+* Uses the more capable GPT-4 model
+* Increases temperature for more diverse outputs
+* Processes 4 topics in parallel
+* Performs 10 topic modeling runs for greater stability
+* Targets 50 filtered topics in the final summary
+
+Using a Local Ollama Instance
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For users who prefer to run models locally:
+
+.. code-block:: bash
+
+    geneinsight query_genes.txt background_genes.txt \
+      --api_service ollama \
+      --api_model llama3:70b \
+      --api_base_url "http://localhost:11434/v1" \
+      --api_temperature 0.2
+
+This uses a locally hosted Llama 3 70B model through Ollama.
+
+Example 2: Customizing Output Parameters
+-------------------------------------
+
+Fine-tuning the statistical thresholds and output:
+
+.. code-block:: bash
+
+    geneinsight query_genes.txt background_genes.txt \
+      --pvalue_threshold 0.01 \
+      --target_filtered_topics 100 \
+      --report_title "Customized Gene Analysis Report" \
+      --temp_dir /path/to/custom/temp
+
+This configuration:
+
+* Uses a more stringent p-value threshold (0.01)
+* Includes more topics (100) in the final report
+* Customizes the report title
+* Specifies a custom temporary directory for processing
+
+Example 3: Multi-Species Comparative Analysis
+------------------------------------------
+
+This example demonstrates analyzing equivalent gene sets across different species.
+
+Preparing Input Files
+^^^^^^^^^^^^^^^^^
+
+Create separate gene list files for each species:
+
+.. code-block:: text
+    :caption: human_immune_genes.txt
+
+    IL6
+    TNF
+    IFNG
+    IL1B
+    # ...more immune-related genes...
+
+.. code-block:: text
+    :caption: mouse_immune_genes.txt
+
+    Il6
+    Tnf
+    Ifng
+    Il1b
+    # ...more immune-related genes...
+
+Running Parallel Analyses
+^^^^^^^^^^^^^^^^^^^^^^
+
+Execute GeneInsight for each species:
+
+.. code-block:: bash
+
+    # Human analysis
+    geneinsight human_immune_genes.txt human_background.txt \
+      --species 9606 \
+      --report_title "Human Immune Response" \
+      -o ./human_immune_analysis
+    
+    # Mouse analysis
+    geneinsight mouse_immune_genes.txt mouse_background.txt \
+      --species 10090 \
+      --report_title "Mouse Immune Response" \
+      -o ./mouse_immune_analysis
+
+Comparing Results
+^^^^^^^^^^^^^^
+
+The generated reports can be compared to identify:
+
+* Conserved biological themes across species
+* Species-specific immune response patterns
+* Differences in functional annotations between databases
+
+Example 4: Custom Gene Summarization
+---------------------------------
+
+Enabling NCBI API for detailed gene summaries:
+
+.. code-block:: bash
+
+    geneinsight query_genes.txt background_genes.txt \
+      --enable-ncbi-api \
+      --report_title "Enhanced Gene Report" \
+      -o ./enhanced_analysis
+
+This configuration:
+
+* Fetches detailed gene descriptions from NCBI
+* Includes richer tooltips and gene information in the report
+* May run slower due to additional API calls

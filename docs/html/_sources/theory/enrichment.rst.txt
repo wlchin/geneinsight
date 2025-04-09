@@ -1,0 +1,78 @@
+Enrichment Analysis
+===================
+
+Traditional Enrichment Analysis
+-------------------------------
+
+Traditional gene set enrichment analysis involves testing whether a set of genes is statistically overrepresented in predefined functional categories such as Gene Ontology terms, KEGG pathways, or other curated gene sets. This approach typically:
+
+1. Takes a query gene set and background gene set as input
+2. Identifies functional categories containing genes from the query set
+3. Uses statistical tests (e.g., hypergeometric test, Fisher's exact test) to assess overrepresentation
+4. Applies multiple testing correction (e.g., Benjamini-Hochberg) to control false discovery rate
+5. Reports enriched terms with their statistical significance
+
+While powerful, this approach has limitations:
+
+* Relies on predefined functional categories that may be incomplete or outdated
+* Returns numerous overlapping terms that are difficult to interpret holistically
+* Often misses biological connections that span multiple databases
+* Requires manual curation to identify meaningful patterns
+
+GeneInsight's Enhanced Approach
+-------------------------------
+
+GeneInsight enhances traditional enrichment analysis through a gene-centric approach:
+
+1. **Gene-Level Querying**: Rather than analyzing the entire gene set at once, GeneInsight queries the STRING database for each gene individually, creating a comprehensive corpus of gene-specific annotations
+2. **Topic-Based Enrichment**: After topic modeling identifies coherent biological themes, GeneInsight links each theme back to genes via their associated descriptions
+3. **Statistical Validation**: Hypergeometric testing with false discovery rate correction validates which biological themes are significantly enriched within the original gene set
+
+Semantic Overlap Metrics
+------------------------
+
+To evaluate relationships between biological term sets, GeneInsight employs a semantic overlap metric defined as:
+
+.. math::
+
+   SC(A,B) = \sum_{a \in A} \max_{b \in B}(\cos(e_a, e_b))
+
+where :math:`e_a` and :math:`e_b` represent embedding vectors of terms from sets A and B respectively, and :math:`\cos` denotes cosine similarity.
+
+This metric allows semantically similar phrases to be counted as overlapping, rather than requiring exact matches. For comparison across datasets of varying sizes, a normalized form is implemented:
+
+.. math::
+
+   NSC(A,B) = \frac{SC(A,B)}{|A|}
+
+where :math:`|A|` represents the cardinality of set A.
+
+Top-k Semantic Similarity Analysis
+-------------------------------
+
+To evaluate how well summaries preserve core themes from source terms, GeneInsight employs a recall-based similarity metric that captures nuanced relationships beyond exact-match approaches:
+
+.. math::
+
+   \text{TopK}(i,B) = \max_k\{\cos(e_{A_i}, e_{B_j}) \mid j \in [1,m]\}
+
+.. math::
+
+   S(A,B) = \frac{1}{n}\sum_{i=1}^{n} \text{mean}(\text{TopK}(i,B))
+
+This approach:
+
+* Focuses on each source term's strongest matches rather than averaging over all pairwise comparisons
+* Prevents dilution of the most meaningful relationships
+* Improves robustness to noise and outliers
+* Effectively handles imbalanced sets where many terms in a larger set may not have close equivalents in the summary
+
+Performance Evaluation
+-------------------
+
+As demonstrated in the manuscript, GeneInsight's enrichment approach offers several advantages over traditional methods:
+
+* Identifies 2-3 times more enriched terms than STRING-DB at equivalent statistical thresholds
+* Shows strong positive correlation with STRING-DB results (r=0.69-0.87), indicating consistency
+* Demonstrates significantly greater semantic diversity in identified terms
+* Maintains robust semantic similarity across different summary lengths

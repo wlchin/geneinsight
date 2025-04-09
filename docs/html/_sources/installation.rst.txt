@@ -1,0 +1,68 @@
+Installation
+===========
+
+Requirements
+-----------
+
+* Python 3.10 or higher
+* Internet connection for API access
+
+Quick Installation
+-----------------
+
+.. code-block:: bash
+
+    # Install directly from GitHub with pip
+    pip install git+https://github.com/wlchin/geneinsight.git
+
+    # OR use UV for faster installation (recommended)
+    # Install UV if you don't have it yet: https://github.com/astral-sh/uv
+    uv pip install git+https://github.com/wlchin/geneinsight.git
+
+Installation with Virtual Environment (Recommended)
+--------------------------------------------------
+
+Using a virtual environment is recommended to avoid package conflicts.
+
+Using standard pip and venv
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+    # Create a virtual environment
+    python -m venv .venv
+
+    # Activate the virtual environment
+    source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
+
+    # Install Geneinsight
+    pip install git+https://github.com/wlchin/geneinsight.git
+
+Using UV (Faster Alternative)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+UV offers faster package resolution and installation:
+
+.. code-block:: bash
+
+    # Install UV if you don't have it yet: https://github.com/astral-sh/uv
+
+    # Create a Python 3.10 virtual environment with UV
+    uv venv --python=3.10
+
+    # Activate the virtual environment
+    source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
+
+    # Install Geneinsight with UV
+    uv pip install git+https://github.com/wlchin/geneinsight.git
+
+API Configuration
+---------------
+
+Set the following environment variable for API access:
+
+.. code-block:: bash
+
+    export OPENAI_API_KEY=your_openai_key_here
+
+Alternatively, you can use a .env file in your project directory.

@@ -1,0 +1,88 @@
+API Support
+==========
+
+GeneInsight supports two API services for topic refinement:
+
+OpenAI API
+---------
+
+The default option that works with models like gpt-4o-mini.
+
+Configuration:
+^^^^^^^^^^^^^
+
+1. **API Key Setup**:
+   
+   Set the environment variable:
+   
+   .. code-block:: bash
+       
+       export OPENAI_API_KEY=your_openai_key_here
+   
+   Alternatively, create a ``.env`` file in your project directory with:
+   
+   .. code-block:: text
+       
+       OPENAI_API_KEY=your_openai_key_here
+
+2. **Command Line Options**:
+   
+   .. code-block:: bash
+       
+       geneinsight query_genes.txt background_genes.txt \
+         --api_service openai \
+         --api_model gpt-4o-mini \
+         --api_temperature 0.2
+
+Supported Models:
+^^^^^^^^^^^^^^^
+
+* ``gpt-4o-mini`` (default)
+* ``gpt-3.5-turbo``
+* ``gpt-4``
+* ``gpt-4o``
+
+Ollama API
+---------
+
+Local option for running models on your own hardware.
+
+Requirements:
+^^^^^^^^^^^
+
+1. Ollama installed with models that support tool use (see `supported models <https://ollama.com/search?c=tools>`_)
+2. API base URL parameter set (typically to ``http://localhost:11434/v1``)
+
+Example Usage:
+^^^^^^^^^^^^
+
+.. code-block:: bash
+    
+    geneinsight query_genes.txt background_genes.txt \
+      --api_service ollama \
+      --api_model llama3:8.1b \
+      --api_base_url "http://localhost:11434/v1"
+
+Recommended Models:
+^^^^^^^^^^^^^^^^^
+
+* ``llama3:8b``
+* ``llama3:70b``
+* ``mistral:7b``
+
+Custom API Configuration
+---------------------
+
+For advanced users, additional API parameters can be adjusted:
+
+* ``--api_parallel_jobs``: Control the number of concurrent API requests (default: 1)
+* ``--api_temperature``: Adjust the randomness of the model's output (default: 0.2)
+
+Performance Considerations
+------------------------
+
+* OpenAI API typically provides higher quality summaries but incurs usage costs
+* Ollama offers cost-free local processing but may require significant hardware resources
+* Consider adjusting ``--api_temperature`` based on your needs:
+  * Lower values (0.1-0.3) for more consistent, focused results
+  * Higher values (0.5-0.8) for more diverse, creative summaries

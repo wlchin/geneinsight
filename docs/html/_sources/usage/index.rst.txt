@@ -1,0 +1,11 @@
+Usage
+=====
+
+This section covers the detailed usage of GeneInsight for gene set analysis, including command-line options, API integration, and understanding the output formats.
+
+.. toctree::
+   :maxdepth: 2
+
+   api
+   output
+

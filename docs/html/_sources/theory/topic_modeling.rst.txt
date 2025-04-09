@@ -1,0 +1,87 @@
+Topic Modeling
+=============
+
+Fundamentals of Topic Modeling
+----------------------------
+
+Topic modeling is an unsupervised machine learning technique used to discover abstract "topics" that occur in a collection of documents. In the context of GeneInsight, documents refer to gene-specific annotations collected from various sources such as the STRING database, literature, and ontologies.
+
+The core assumption behind topic modeling is that documents are mixtures of topics, where a topic is a probability distribution over words. Topic modeling algorithms identify patterns of word co-occurrence across documents, revealing latent themes without requiring predefined categories.
+
+BERTopic Implementation
+---------------------
+
+GeneInsight employs BERTopic, a state-of-the-art topic modeling technique that leverages BERT embeddings and clustering to create coherent topics. The workflow involves:
+
+1. **Document Embedding**: Transforming textual gene annotations into dense vector representations using SentenceTransformer (paraphrase-MiniLM-L6-v2)
+2. **Dimensionality Reduction**: Applying UMAP to project high-dimensional embeddings into a lower-dimensional space
+3. **Clustering**: Grouping similar documents using HDBSCAN to identify coherent topics
+4. **Topic Representation**: Extracting representative terms for each topic using class-based TF-IDF
+
+This approach offers several advantages over traditional topic modeling methods:
+
+* Captures semantic relationships between terms (not just lexical co-occurrence)
+* Produces more coherent topics with better separation
+* Handles polysemy and synonymy more effectively
+* Functions well with shorter texts typical of gene annotations
+
+LLM Integration for Theme Generation
+----------------------------------
+
+A key innovation in GeneInsight is how it bridges topic modeling and biological interpretation through Large Language Models (LLMs). After BERTopic identifies coherent topics:
+
+1. **Theme Prompting**: The representative terms and documents from each BERTopic cluster are used to create prompts for the LLM
+2. **Biological Context Addition**: Prompts include biological context to guide the LLM toward meaningful interpretations
+3. **Theme Creation**: The LLM synthesizes this information to generate interpretable biological themes that capture the essence of each topic
+4. **Structured Output**: These LLM-generated themes include both concise summaries and detailed explanations of biological significance
+
+This LLM-based interpretation layer transforms raw topic clusters into actionable biological insights that can be used for downstream enrichment analysis. By leveraging the LLM's ability to contextualize information within the broader biomedical knowledge domain, GeneInsight creates themes that are both statistically robust and biologically meaningful.
+
+Multi-run Convergence Strategy
+----------------------------
+
+To ensure robust theme identification, GeneInsight performs multiple independent rounds of topic modeling with different random seeds. This approach addresses the inherent stochasticity of dimensionality reduction and clustering algorithms, identifying stable themes that persist across initializations.
+
+The system measures consistency using cosine similarity between topics from different runs, focusing on topics that appear repeatedly. This convergence strategy was validated empirically using:
+
+1. **Normalized Soft Cardinality**: Measuring semantic overlap between terms identified in each run and the complete term set
+2. **Rank-Based Metrics**: Evaluating topic ranking stability using Rank-Biased Overlap and Kendall's τ correlation
+
+As shown in the manuscript, GeneInsight's topic modeling approach converges after approximately 5 sampling rounds, with additional runs providing minimal improvement in theme coverage and stability.
+
+Topic Clustering and Hierarchical Organization
+-------------------------------------------
+
+After generating topics across multiple runs, GeneInsight employs a secondary clustering step with two essential purposes: to ensure biological distinctiveness of themes and to create a hierarchical organization for end-user navigation.
+
+The clustering process works as follows:
+
+1. Computes semantic similarity between all topic pairs using cosine similarity
+2. Applies hierarchical clustering to identify topic groups
+3. Selects representative topics from each cluster based on frequency and coherence
+
+The optimal clustering parameters are determined using cluster quality metrics:
+
+* **Davies-Bouldin Index**: Measuring the average similarity between clusters
+* **Calinski-Harabasz Score**: Evaluating the ratio of between-cluster to within-cluster dispersion
+
+This second round of topic clustering serves a critical user-focused purpose: to organize and summarize themes hierarchically for the HTML report. This organization facilitates intuitive navigation by end users, allowing them to:
+
+* Explore major biological themes at the top level
+* Drill down into related sub-themes within each category
+* Navigate between related concepts through semantic connections
+* Quickly locate specific biological processes of interest
+
+By structuring the enrichment results in this hierarchical manner, GeneInsight transforms what would otherwise be a flat list of statistically significant terms into an organized knowledge framework that reflects the natural hierarchical structure of biological processes. This organization makes the output significantly more accessible to researchers who may not have expertise in bioinformatics but need to extract meaningful insights from their gene lists.
+
+Downstream Enrichment Analysis
+----------------------------
+
+The LLM-generated biological themes serve as the foundation for GeneInsight's enrichment analysis:
+
+1. Each theme is linked back to the original genes through their associated annotations
+2. Hypergeometric testing determines which themes are statistically enriched in the input gene set
+3. False discovery rate correction controls for multiple hypothesis testing
+4. The resulting enriched themes provide a biologically meaningful interpretation of the gene set
+
+A primary motivation for this approach is to provide human-readable summaries in the HTML report. The LLM is leveraged not only for generating theme descriptions but also for providing biological context to the enrichment analysis, translating statistical findings into clear, interpretable insights that biologists can readily understand and act upon.

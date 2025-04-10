@@ -21,6 +21,7 @@ A Python package for topic modeling of gene sets with enrichment analysis.
 - [Output Format](#output-format)
 - [Interactive Report](#interactive-report)
 - [Examples](#examples)
+- [Documentation](#documentation)
 - [License](#license)
 
 ## Overview
@@ -266,6 +267,12 @@ For a quick start, try running:
 ```bash
 geneinsight examples/sample.txt examples/sample_background.txt -o ./output
 ```
+
+## Documentation
+
+Comprehensive documentation is available at [the Geneinsight documentation site](https://wlchin.github.io/geneinsight/index.html).
+
+The documentation includes detailed API references, examples, and advanced usage guides.
 
 ## License
 

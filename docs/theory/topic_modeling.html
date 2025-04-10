@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Enrichment Analysis" href="enrichment.html" /><link rel="prev" title="Theoretical Foundation" href="overview.html" />
 
-    <!-- Generated with Sphinx 8.2.3 and Furo 2024.08.06 -->
+    <!-- Generated with Sphinx 8.1.3 and Furo 2024.08.06 -->
         <title>Topic Modeling - GeneInsight 0.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=354aac6f" />
@@ -267,80 +267,74 @@
 <h1>Topic Modeling<a class="headerlink" href="#topic-modeling" title="Link to this heading">¶</a></h1>
 <section id="fundamentals-of-topic-modeling">
 <h2>Fundamentals of Topic Modeling<a class="headerlink" href="#fundamentals-of-topic-modeling" title="Link to this heading">¶</a></h2>
-<p>Topic modeling is an unsupervised machine learning technique used to discover abstract “topics” that occur in a collection of documents. In the context of GeneInsight, documents refer to gene-specific annotations collected from various sources such as the STRING database, literature, and ontologies.</p>
-<p>The core assumption behind topic modeling is that documents are mixtures of topics, where a topic is a probability distribution over words. Topic modeling algorithms identify patterns of word co-occurrence across documents, revealing latent themes without requiring predefined categories.</p>
+<p>Topic modeling is an unsupervised machine learning technique that discovers abstract “topics” within document collections. In GeneInsight, documents are gene annotations from sources like the STRING database, literature, and ontologies.</p>
+<p>The basic premise is that documents contain mixtures of topics, with each topic representing a probability distribution over words. These algorithms identify word co-occurrence patterns to reveal underlying themes without requiring predefined categories.</p>
 </section>
 <section id="bertopic-implementation">
 <h2>BERTopic Implementation<a class="headerlink" href="#bertopic-implementation" title="Link to this heading">¶</a></h2>
-<p>GeneInsight employs BERTopic, a state-of-the-art topic modeling technique that leverages BERT embeddings and clustering to create coherent topics. The workflow involves:</p>
+<p>GeneInsight uses BERTopic, which leverages BERT embeddings and clustering for topic creation through these steps:</p>
 <ol class="arabic simple">
-<li><p><strong>Document Embedding</strong>: Transforming textual gene annotations into dense vector representations using SentenceTransformer (paraphrase-MiniLM-L6-v2)</p></li>
-<li><p><strong>Dimensionality Reduction</strong>: Applying UMAP to project high-dimensional embeddings into a lower-dimensional space</p></li>
-<li><p><strong>Clustering</strong>: Grouping similar documents using HDBSCAN to identify coherent topics</p></li>
-<li><p><strong>Topic Representation</strong>: Extracting representative terms for each topic using class-based TF-IDF</p></li>
+<li><p><strong>Document Embedding</strong>: Converting gene annotations into vector representations using SentenceTransformer</p></li>
+<li><p><strong>Dimensionality Reduction</strong>: Using UMAP to project vectors into lower-dimensional space</p></li>
+<li><p><strong>Clustering</strong>: Applying HDBSCAN to group similar documents</p></li>
+<li><p><strong>Topic Representation</strong>: Extracting key terms for each topic using class-based TF-IDF</p></li>
 </ol>
-<p>This approach offers several advantages over traditional topic modeling methods:</p>
-<ul class="simple">
-<li><p>Captures semantic relationships between terms (not just lexical co-occurrence)</p></li>
-<li><p>Produces more coherent topics with better separation</p></li>
-<li><p>Handles polysemy and synonymy more effectively</p></li>
-<li><p>Functions well with shorter texts typical of gene annotations</p></li>
-</ul>
+<p>This approach improves upon traditional methods by:
+* Capturing semantic relationships between terms
+* Creating more coherent topics
+* Handling polysemy and synonymy
+* Working effectively with short gene annotations</p>
 </section>
 <section id="llm-integration-for-theme-generation">
 <h2>LLM Integration for Theme Generation<a class="headerlink" href="#llm-integration-for-theme-generation" title="Link to this heading">¶</a></h2>
-<p>A key innovation in GeneInsight is how it bridges topic modeling and biological interpretation through Large Language Models (LLMs). After BERTopic identifies coherent topics:</p>
+<p>GeneInsight connects topic modeling with biological interpretation through Large Language Models (LLMs):</p>
 <ol class="arabic simple">
-<li><p><strong>Theme Prompting</strong>: The representative terms and documents from each BERTopic cluster are used to create prompts for the LLM</p></li>
-<li><p><strong>Biological Context Addition</strong>: Prompts include biological context to guide the LLM toward meaningful interpretations</p></li>
-<li><p><strong>Theme Creation</strong>: The LLM synthesizes this information to generate interpretable biological themes that capture the essence of each topic</p></li>
-<li><p><strong>Structured Output</strong>: These LLM-generated themes include both concise summaries and detailed explanations of biological significance</p></li>
+<li><p>Representative terms and documents from each cluster create prompts for the LLM</p></li>
+<li><p>Biological context guides the LLM toward meaningful interpretations</p></li>
+<li><p>The LLM generates interpretable biological themes from the topics</p></li>
+<li><p>Structured outputs include both concise summaries and detailed biological explanations</p></li>
 </ol>
-<p>This LLM-based interpretation layer transforms raw topic clusters into actionable biological insights that can be used for downstream enrichment analysis. By leveraging the LLM’s ability to contextualize information within the broader biomedical knowledge domain, GeneInsight creates themes that are both statistically robust and biologically meaningful.</p>
+<p>This LLM layer transforms statistical clusters into actionable biological insights for enrichment analysis, leveraging broader biomedical knowledge to create themes that are both statistically robust and biologically meaningful.</p>
 </section>
 <section id="multi-run-convergence-strategy">
 <h2>Multi-run Convergence Strategy<a class="headerlink" href="#multi-run-convergence-strategy" title="Link to this heading">¶</a></h2>
-<p>To ensure robust theme identification, GeneInsight performs multiple independent rounds of topic modeling with different random seeds. This approach addresses the inherent stochasticity of dimensionality reduction and clustering algorithms, identifying stable themes that persist across initializations.</p>
-<p>The system measures consistency using cosine similarity between topics from different runs, focusing on topics that appear repeatedly. This convergence strategy was validated empirically using:</p>
+<p>To ensure robust results, GeneInsight performs multiple independent rounds of topic modeling with different random seeds, addressing the inherent variability in dimensionality reduction and clustering.</p>
+<p>The system measures consistency between topics from different runs, focusing on persistent themes. Validation metrics include:</p>
 <ol class="arabic simple">
-<li><p><strong>Normalized Soft Cardinality</strong>: Measuring semantic overlap between terms identified in each run and the complete term set</p></li>
-<li><p><strong>Rank-Based Metrics</strong>: Evaluating topic ranking stability using Rank-Biased Overlap and Kendall’s τ correlation</p></li>
+<li><p><strong>Normalized Soft Cardinality</strong>: Measuring semantic overlap between terms</p></li>
+<li><p><strong>Rank-Based Metrics</strong>: Evaluating topic ranking stability</p></li>
 </ol>
-<p>As shown in the manuscript, GeneInsight’s topic modeling approach converges after approximately 5 sampling rounds, with additional runs providing minimal improvement in theme coverage and stability.</p>
+<p>Research shows the approach converges after approximately 5 sampling rounds, with minimal gains from additional runs.</p>
 </section>
 <section id="topic-clustering-and-hierarchical-organization">
 <h2>Topic Clustering and Hierarchical Organization<a class="headerlink" href="#topic-clustering-and-hierarchical-organization" title="Link to this heading">¶</a></h2>
-<p>After generating topics across multiple runs, GeneInsight employs a secondary clustering step with two essential purposes: to ensure biological distinctiveness of themes and to create a hierarchical organization for end-user navigation.</p>
-<p>The clustering process works as follows:</p>
-<ol class="arabic simple">
-<li><p>Computes semantic similarity between all topic pairs using cosine similarity</p></li>
-<li><p>Applies hierarchical clustering to identify topic groups</p></li>
-<li><p>Selects representative topics from each cluster based on frequency and coherence</p></li>
-</ol>
-<p>The optimal clustering parameters are determined using cluster quality metrics:</p>
-<ul class="simple">
-<li><p><strong>Davies-Bouldin Index</strong>: Measuring the average similarity between clusters</p></li>
-<li><p><strong>Calinski-Harabasz Score</strong>: Evaluating the ratio of between-cluster to within-cluster dispersion</p></li>
-</ul>
-<p>This second round of topic clustering serves a critical user-focused purpose: to organize and summarize themes hierarchically for the HTML report. This organization facilitates intuitive navigation by end users, allowing them to:</p>
-<ul class="simple">
-<li><p>Explore major biological themes at the top level</p></li>
-<li><p>Drill down into related sub-themes within each category</p></li>
-<li><p>Navigate between related concepts through semantic connections</p></li>
-<li><p>Quickly locate specific biological processes of interest</p></li>
-</ul>
-<p>By structuring the enrichment results in this hierarchical manner, GeneInsight transforms what would otherwise be a flat list of statistically significant terms into an organized knowledge framework that reflects the natural hierarchical structure of biological processes. This organization makes the output significantly more accessible to researchers who may not have expertise in bioinformatics but need to extract meaningful insights from their gene lists.</p>
+<p>After generating topics across multiple runs, GeneInsight performs secondary clustering to:
+1. Ensure biological distinctiveness of themes
+2. Create a hierarchical organization for user navigation</p>
+<p>The process:
+1. Computes semantic similarity between topic pairs
+2. Applies hierarchical clustering to identify topic groups
+3. Selects representative topics from each cluster</p>
+<p>Cluster quality is evaluated using:
+* <strong>Davies-Bouldin Index</strong>: Measuring average similarity between clusters
+* <strong>Calinski-Harabasz Score</strong>: Evaluating cluster separation</p>
+<p>This hierarchical organization helps users:
+* Explore major biological themes at the top level
+* Drill down into related sub-themes
+* Navigate between connected concepts
+* Locate specific biological processes efficiently</p>
+<p>This structure transforms a flat list of terms into an organized knowledge framework reflecting the natural hierarchy of biological processes.</p>
 </section>
 <section id="downstream-enrichment-analysis">
 <h2>Downstream Enrichment Analysis<a class="headerlink" href="#downstream-enrichment-analysis" title="Link to this heading">¶</a></h2>
-<p>The LLM-generated biological themes serve as the foundation for GeneInsight’s enrichment analysis:</p>
+<p>The LLM-generated themes form the foundation for enrichment analysis:</p>
 <ol class="arabic simple">
-<li><p>Each theme is linked back to the original genes through their associated annotations</p></li>
-<li><p>Hypergeometric testing determines which themes are statistically enriched in the input gene set</p></li>
-<li><p>False discovery rate correction controls for multiple hypothesis testing</p></li>
-<li><p>The resulting enriched themes provide a biologically meaningful interpretation of the gene set</p></li>
+<li><p>Themes are linked back to original genes through their annotations</p></li>
+<li><p>Hypergeometric testing identifies statistically enriched themes</p></li>
+<li><p>False discovery rate correction controls for multiple testing</p></li>
+<li><p>Enriched themes provide meaningful biological interpretation of the gene set</p></li>
 </ol>
-<p>A primary motivation for this approach is to provide human-readable summaries in the HTML report. The LLM is leveraged not only for generating theme descriptions but also for providing biological context to the enrichment analysis, translating statistical findings into clear, interpretable insights that biologists can readily understand and act upon.</p>
+<p>This approach produces human-readable summaries in the HTML report, with the LLM translating statistical findings into clear insights that biologists can readily understand and apply.</p>
 </section>
 </section>
 

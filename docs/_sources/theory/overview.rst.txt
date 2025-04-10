@@ -2,7 +2,7 @@ Theoretical Foundation
 =====================
 
 The Challenge of Gene Set Interpretation
----------------------------------------
+----------------------------------------
 
 Gene set interpretation is a fundamental task in functional genomics where researchers must derive biological insights from lists of genes identified through high-throughput experiments. Current approaches utilize statistical enrichment methods that query predefined functional databases such as Gene Ontology and KEGG pathways to identify overrepresented biological processes.
 
@@ -16,14 +16,14 @@ However, exploratory gene set analysis has become increasingly challenging for s
 These challenges make manual curation of enrichment outputs not only time-consuming and error-prone but also risk overlooking crucial biological connections.
 
 Topic Modeling Approach
-----------------------
+-----------------------
 
 To address these limitations, GeneInsight employs topic modeling approaches that can automatically identify patterns across diverse gene annotations. Topic modeling offers a complementary perspective by analyzing how terms co-occur across texts, revealing underlying themes without requiring predefined categories.
 
 These unsupervised statistical methods—including Latent Dirichlet Allocation (LDA) and Non-negative Matrix Factorization (NMF)—identify recurring patterns in document collections. The resulting latent themes represent collections of related terms that frequently appear together and may correspond to biological processes, pathways, or functional modules not explicitly defined in current annotation databases.
 
 LLM Integration
---------------
+---------------
 
 Recent advances in large language models (LLMs) create powerful new opportunities for gene set interpretation. LLMs have demonstrated remarkable capabilities in contextual understanding and natural language generation, enabling automated synthesis of distributed biological knowledge.
 

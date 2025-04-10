@@ -1,5 +1,5 @@
 Theoretical Background
-====================
+======================
 
 This section covers the theoretical foundation and concepts behind GeneInsight.
 

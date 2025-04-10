@@ -3,7 +3,7 @@ System Architecture
 
 GeneInsight employs a two-stage approach to extract and organize biological information from gene sets.
 
-.. figure:: /_static/workflow_diagram.png
+.. figure:: /_static/GeneInsight.png
    :alt: GeneInsight system architecture and workflow
    :width: 600px
 

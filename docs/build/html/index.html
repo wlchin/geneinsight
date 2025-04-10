@@ -269,14 +269,15 @@
 <img alt="Coverage" src="https://img.shields.io/badge/coverage-89%25-brightgreen" />
 <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue" />
 <p><strong>GeneInsight</strong>: AI-powered tool for gene set interpretation through advanced topic modeling and large language models.</p>
+<img alt="GeneInsight logo" src="_images/GeneInsight.png" />
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
 <p>GeneInsight addresses the challenge of interpreting gene sets by combining advanced topic modeling with large language models to automatically synthesize diverse biological annotations. It consolidates extensive annotations into coherent thematic summaries, enabling rapid extraction of biologically significant insights that conventional enrichment analyses often overlook.</p>
 <p>The tool provides a comprehensive pipeline for analyzing gene sets:</p>
 <ol class="arabic simple">
-<li><p><strong>Gene Enrichment</strong>: Query STRING database for gene-specific annotations</p></li>
-<li><p><strong>Topic Modeling</strong>: Apply BERTopic to identify coherent biological themes</p></li>
-<li><p><strong>LLM Integration</strong>: Use language models to refine and interpret topics</p></li>
+<li><p><strong>Gene Enrichment</strong>: Query STRING database (<a class="reference external" href="https://string-db.org/">https://string-db.org/</a>) for gene-specific annotations</p></li>
+<li><p><strong>Topic Modeling</strong>: Apply BERTopic (<a class="reference external" href="https://maartengr.github.io/BERTopic/index.html">https://maartengr.github.io/BERTopic/index.html</a>) to identify coherent biological themes</p></li>
+<li><p><strong>LLM Integration</strong>: Use language models to refine and interpret topics through Retrieval Augmented Generation (RAG), enhancing topic interpretations with domain-specific knowledge</p></li>
 <li><p><strong>Enrichment Analysis</strong>: Perform hypergeometric testing to validate biological relevance</p></li>
 <li><p><strong>Results Visualization</strong>: Generate interactive reports with biological insights</p></li>
 </ol>
@@ -332,6 +333,17 @@
 </ul>
 </div>
 </section>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading">¶</a></h2>
+<dl class="simple" id="bertopic-ref">
+<dt><strong>BERTopic</strong></dt><dd><p><a class="reference external" href="https://maartengr.github.io/BERTopic/index.html">https://maartengr.github.io/BERTopic/index.html</a> - Advanced topic modeling technique that leverages BERT embeddings and clustering algorithms to create coherent topics</p>
+</dd>
+</dl>
+<dl class="simple" id="stringdb-ref">
+<dt><strong>STRING-DB</strong></dt><dd><p><a class="reference external" href="https://string-db.org/">https://string-db.org/</a> - Database of known and predicted protein-protein interactions, providing comprehensive gene annotations</p>
+</dd>
+</dl>
+</section>
 </section>
 
         </article>
@@ -382,6 +394,7 @@
 <li><a class="reference internal" href="#">GeneInsight Documentation</a><ul>
 <li><a class="reference internal" href="#overview">Overview</a></li>
 <li><a class="reference internal" href="#key-features">Key Features</a></li>
+<li><a class="reference internal" href="#references">References</a></li>
 </ul>
 </li>
 </ul>

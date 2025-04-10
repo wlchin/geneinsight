@@ -10,6 +10,9 @@ GeneInsight Documentation
 
 **GeneInsight**: AI-powered tool for gene set interpretation through advanced topic modeling and large language models.
 
+.. image:: _static/GeneInsight.png
+   :alt: GeneInsight logo
+
 Overview
 --------
 
@@ -17,9 +20,9 @@ GeneInsight addresses the challenge of interpreting gene sets by combining advan
 
 The tool provides a comprehensive pipeline for analyzing gene sets:
 
-1. **Gene Enrichment**: Query STRING database for gene-specific annotations
-2. **Topic Modeling**: Apply BERTopic to identify coherent biological themes
-3. **LLM Integration**: Use language models to refine and interpret topics
+1. **Gene Enrichment**: Query STRING database (`https://string-db.org/ <https://string-db.org/>`_) for gene-specific annotations
+2. **Topic Modeling**: Apply BERTopic (`https://maartengr.github.io/BERTopic/index.html <https://maartengr.github.io/BERTopic/index.html>`_) to identify coherent biological themes
+3. **LLM Integration**: Use language models to refine and interpret topics through Retrieval Augmented Generation (RAG), enhancing topic interpretations with domain-specific knowledge
 4. **Enrichment Analysis**: Perform hypergeometric testing to validate biological relevance
 5. **Results Visualization**: Generate interactive reports with biological insights
 
@@ -37,10 +40,23 @@ Key Features
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
-
+   
    installation
    getting_started
    usage/index
    theory/index
    architecture/index
    examples/index
+
+References
+----------
+
+.. _bertopic-ref:
+
+**BERTopic**
+  `https://maartengr.github.io/BERTopic/index.html <https://maartengr.github.io/BERTopic/index.html>`_ - Advanced topic modeling technique that leverages BERT embeddings and clustering algorithms to create coherent topics
+
+.. _stringdb-ref:
+
+**STRING-DB**
+  `https://string-db.org/ <https://string-db.org/>`_ - Database of known and predicted protein-protein interactions, providing comprehensive gene annotations

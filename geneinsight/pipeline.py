@@ -32,7 +32,7 @@ class Pipeline:
         filtered_n_samples: int = 10,  # parameter for filtered sets topic modeling
         api_temperature: float = 0.2,   # temperature parameter
         call_ncbi_api: bool = True,     # whether to call NCBI API for gene summaries
-        use_local_stringdb: bool = False  # whether to use local StringDB module instead of API
+        use_local_stringdb: bool = True  # whether to use local StringDB module instead of API (default now True)
     ):
         self.output_dir = os.path.abspath(output_dir)
 
@@ -46,6 +46,10 @@ class Pipeline:
         else:
             self.temp_dir = os.path.abspath(temp_dir)
             self._temp_is_system = False
+
+        # Check for OpenAI API key if using OpenAI service
+        if api_service.lower() == "openai":
+            self._check_openai_api_key()
 
         self.n_samples = n_samples
         self.num_topics = num_topics
@@ -94,6 +98,18 @@ class Pipeline:
         logger.debug(f"Using temporary directory: {self.temp_dir}")
         logger.debug(f"Species: {self.species}, NCBI API calls: {'enabled' if self.call_ncbi_api else 'disabled'}")
         logger.debug(f"StringDB mode: {'local' if self.use_local_stringdb else 'API'}")
+
+    def _check_openai_api_key(self):
+        """Check if OpenAI API key is available in environment variables."""
+        openai_key = os.environ.get("OPENAI_API_KEY")
+        if not openai_key:
+            error_msg = "OpenAI API key not found in environment variables. Please set the OPENAI_API_KEY environment variable."
+            logger.error(error_msg)
+            self.console.print(f"[bold red]ERROR: {error_msg}[/bold red]")
+            self.console.print("[bold yellow]Hint: You can set it with 'export OPENAI_API_KEY=your_key' (Linux/Mac) or 'set OPENAI_API_KEY=your_key' (Windows)[/bold yellow]")
+            raise ValueError(error_msg)
+        else:
+            logger.debug("OpenAI API key found in environment variables")
 
     def run(
         self,

@@ -6,8 +6,27 @@
 
 A Python package for topic modeling of gene sets with enrichment analysis.
 
+## Overview
+
+Geneinsight provides a comprehensive pipeline for analyzing gene sets through topic modeling and enrichment analysis:
+
+![Geneinsight Framework](framework.png)
+
+1. **Gene Enrichment**: Query StringDB for gene enrichment data
+2. **Topic Modeling**: Apply BERTopic to identify themes in gene sets
+3. **Prompt Generation**: Generate prompts for language models based on topic data
+4. **API Integration**: Use language models to refine topics and create meaningful annotations
+5. **Enrichment Analysis**: Perform hypergeometric enrichment analysis on identified gene sets
+6. **Results Packaging**: Export all results in a zipped format for easy sharing and analysis
+7. **Interactive Report**: Generate an HTML report to visualize the results
+
+## Documentation
+
+Comprehensive documentation is available at [the Geneinsight documentation site](https://wlchin.github.io/geneinsight/index.html).
+
+The documentation includes detailed API references, examples, and advanced usage guides.
+
 ## Table of Contents
-- [Overview](#overview)
 - [Installation](#installation)
   - [Quick Installation](#quick-installation)
   - [Installation with Virtual Environment](#installation-with-virtual-environment-recommended)
@@ -21,20 +40,7 @@ A Python package for topic modeling of gene sets with enrichment analysis.
 - [Output Format](#output-format)
 - [Interactive Report](#interactive-report)
 - [Examples](#examples)
-- [Documentation](#documentation)
 - [License](#license)
-
-## Overview
-
-Geneinsight provides a comprehensive pipeline for analyzing gene sets through topic modeling and enrichment analysis:
-
-1. **Gene Enrichment**: Query StringDB for gene enrichment data
-2. **Topic Modeling**: Apply BERTopic to identify themes in gene sets
-3. **Prompt Generation**: Generate prompts for language models based on topic data
-4. **API Integration**: Use language models to refine topics and create meaningful annotations
-5. **Enrichment Analysis**: Perform hypergeometric enrichment analysis on identified gene sets
-6. **Results Packaging**: Export all results in a zipped format for easy sharing and analysis
-7. **Interactive Report**: Generate an HTML report to visualize the results
 
 ## Installation
 
@@ -267,12 +273,6 @@ For a quick start, try running:
 ```bash
 geneinsight examples/sample.txt examples/sample_background.txt -o ./output
 ```
-
-## Documentation
-
-Comprehensive documentation is available at [the Geneinsight documentation site](https://wlchin.github.io/geneinsight/index.html).
-
-The documentation includes detailed API references, examples, and advanced usage guides.
 
 ## License
 

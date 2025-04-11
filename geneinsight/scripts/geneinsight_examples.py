@@ -14,10 +14,20 @@ def create(dest_path):
         dest_path = Path.cwd()
     else:
         dest_path = Path(dest_path).resolve()
+        # Make sure the destination path exists
+        try:
+            dest_path.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            console.print(f"[red]Error creating directory {dest_path}: {str(e)}[/red]")
+            return
     
     # Create examples folder
     examples_path = dest_path / "examples"
-    examples_path.mkdir(exist_ok=True)
+    try:
+        examples_path.mkdir(exist_ok=True)
+    except Exception as e:
+        console.print(f"[red]Error creating examples directory: {str(e)}[/red]")
+        return
     console.print(f"[green]Created examples folder at {examples_path}[/green]")
     
     # Define files to copy

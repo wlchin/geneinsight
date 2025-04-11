@@ -1,20 +1,14 @@
 #!/usr/bin/env python
 import os
 import shutil
-import typer
+import argparse
 from pathlib import Path
 from importlib import resources
 from rich.console import Console
 
 console = Console()
-app = typer.Typer(help="Create examples folder with sample files")
 
-@app.command()
-def create(
-    dest_path: Path = typer.Option(
-        None, "--path", "-p", help="Path where to create examples folder (default: current directory)"
-    )
-):
+def create(dest_path):
     """Create an examples folder and copy sample files from package data."""
     if dest_path is None:
         dest_path = Path.cwd()
@@ -49,7 +43,16 @@ def create(
         console.print("[yellow]Make sure you have a 'data' directory in your package with sample files.[/yellow]")
 
 def main():
-    app()
+    parser = argparse.ArgumentParser(description="Create examples folder with sample files")
+    parser.add_argument(
+        "--path", "-p", 
+        dest="dest_path",
+        type=Path,
+        help="Path where to create examples folder (default: current directory)"
+    )
+    
+    args = parser.parse_args()
+    create(args.dest_path)
 
 if __name__ == "__main__":
     main()

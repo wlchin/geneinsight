@@ -2,14 +2,27 @@ Output Format
 =============
 GeneInsight produces a comprehensive set of output files containing the results of gene set analysis. This section describes the structure and content of these outputs.
 
+Output Archives
+---------------
+The results are delivered in two separate zip archives:
+
+1. **sphinx_build.zip** - Contains the complete interactive HTML report with all visualizations
+2. **[timestamp]_analysis.zip** - Contains all data files, CSVs, and analysis results
+
 Directory Structure
 -------------------
-The output directory contains:
+When extracted, the output directories contain:
 
 .. code-block:: text
 
-    output/
-    ├── index.html # Interactive HTML report
+    sphinx_build/
+    ├── index.html # Main entry point for interactive HTML report
+    ├── themes/ # Individual theme pages
+    ├── visualizations/ # Interactive charts and diagrams
+    ├── static/ # CSS, JavaScript, and other assets
+    └── downloads/ # Downloadable result files
+    
+    analysis_files/
     ├── enrichment.csv # Gene enrichment data from StringDB
     ├── documents.csv # Document descriptions for topic modeling
     ├── topics.csv # Topic modeling results
@@ -18,8 +31,7 @@ The output directory contains:
     ├── summary.csv # Summary of topic modeling and enrichment
     ├── enriched.csv # Hypergeometric enrichment results
     ├── filtered.csv # Final filtered topics
-    ├── metadata.csv # Run information and parameters
-    └── geneinsight_results.zip # All results in compressed format
+    └── metadata.csv # Run information and parameters
 
 File Descriptions
 -----------------
@@ -98,7 +110,7 @@ Information about the analysis run:
 
 Interactive HTML Report
 -----------------------
-The ``index.html`` file provides a entry point to the html report which provides an interactive visualization of the analysis results.
+The ``index.html`` file in the sphinx_build directory provides an entry point to the HTML report which delivers an interactive visualization of the analysis results.
 
 Theme Pages
 ^^^^^^^^^^^
@@ -126,8 +138,8 @@ Interactive interface to download:
 
 Exploring the Results
 ---------------------
-After running GeneInsight, navigate to the output directory to find:
+After downloading and extracting the archives:
 
-* **HTML Report**: Open ``index.html`` to view the interactive visualization
-* **CSV Files**: Explore detailed results in the various output files
-* **ZIP Archive**: A compressed version of all outputs for easy sharing
+1. Open the **sphinx_build/** directory and load ``index.html`` in a web browser to access the interactive report
+2. Navigate to the **[timestamp]_analysis/** directory to directly access the raw data files for further analysis
+3. Use the interactive report to explore visualizations and download specific subsets of results

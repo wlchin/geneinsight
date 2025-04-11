@@ -267,11 +267,25 @@
           <section id="output-format">
 <h1>Output Format<a class="headerlink" href="#output-format" title="Link to this heading">¶</a></h1>
 <p>GeneInsight produces a comprehensive set of output files containing the results of gene set analysis. This section describes the structure and content of these outputs.</p>
+<section id="output-archives">
+<h2>Output Archives<a class="headerlink" href="#output-archives" title="Link to this heading">¶</a></h2>
+<p>The results are delivered in two separate zip archives:</p>
+<ol class="arabic simple">
+<li><p><strong>sphinx_build.zip</strong> - Contains the complete interactive HTML report with all visualizations</p></li>
+<li><p><strong>[timestamp]_analysis.zip</strong> - Contains all data files, CSVs, and analysis results</p></li>
+</ol>
+</section>
 <section id="directory-structure">
 <h2>Directory Structure<a class="headerlink" href="#directory-structure" title="Link to this heading">¶</a></h2>
-<p>The output directory contains:</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>output/
-├── index.html # Interactive HTML report
+<p>When extracted, the output directories contain:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>sphinx_build/
+├── index.html # Main entry point for interactive HTML report
+├── themes/ # Individual theme pages
+├── visualizations/ # Interactive charts and diagrams
+├── static/ # CSS, JavaScript, and other assets
+└── downloads/ # Downloadable result files
+
+analysis_files/
 ├── enrichment.csv # Gene enrichment data from StringDB
 ├── documents.csv # Document descriptions for topic modeling
 ├── topics.csv # Topic modeling results
@@ -280,8 +294,7 @@
 ├── summary.csv # Summary of topic modeling and enrichment
 ├── enriched.csv # Hypergeometric enrichment results
 ├── filtered.csv # Final filtered topics
-├── metadata.csv # Run information and parameters
-└── geneinsight_results.zip # All results in compressed format
+└── metadata.csv # Run information and parameters
 </pre></div>
 </div>
 </section>
@@ -371,7 +384,7 @@
 </section>
 <section id="interactive-html-report">
 <h2>Interactive HTML Report<a class="headerlink" href="#interactive-html-report" title="Link to this heading">¶</a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">index.html</span></code> file provides a entry point to the html report which provides an interactive visualization of the analysis results.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">index.html</span></code> file in the sphinx_build directory provides an entry point to the HTML report which delivers an interactive visualization of the analysis results.</p>
 <section id="theme-pages">
 <h3>Theme Pages<a class="headerlink" href="#theme-pages" title="Link to this heading">¶</a></h3>
 <p>Dedicated pages for each identified theme featuring:</p>
@@ -402,12 +415,12 @@
 </section>
 <section id="exploring-the-results">
 <h2>Exploring the Results<a class="headerlink" href="#exploring-the-results" title="Link to this heading">¶</a></h2>
-<p>After running GeneInsight, navigate to the output directory to find:</p>
-<ul class="simple">
-<li><p><strong>HTML Report</strong>: Open <code class="docutils literal notranslate"><span class="pre">index.html</span></code> to view the interactive visualization</p></li>
-<li><p><strong>CSV Files</strong>: Explore detailed results in the various output files</p></li>
-<li><p><strong>ZIP Archive</strong>: A compressed version of all outputs for easy sharing</p></li>
-</ul>
+<p>After downloading and extracting the archives:</p>
+<ol class="arabic simple">
+<li><p>Open the <strong>sphinx_build/</strong> directory and load <code class="docutils literal notranslate"><span class="pre">index.html</span></code> in a web browser to access the interactive report</p></li>
+<li><p>Navigate to the <strong>[timestamp]_analysis/</strong> directory to directly access the raw data files for further analysis</p></li>
+<li><p>Use the interactive report to explore visualizations and download specific subsets of results</p></li>
+</ol>
 </section>
 </section>
 
@@ -467,6 +480,7 @@
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Output Format</a><ul>
+<li><a class="reference internal" href="#output-archives">Output Archives</a></li>
 <li><a class="reference internal" href="#directory-structure">Directory Structure</a></li>
 <li><a class="reference internal" href="#file-descriptions">File Descriptions</a><ul>
 <li><a class="reference internal" href="#enrichment-csv">enrichment.csv</a></li>

@@ -308,21 +308,29 @@
 </section>
 <section id="topic-clustering-and-hierarchical-organization">
 <h2>Topic Clustering and Hierarchical Organization<a class="headerlink" href="#topic-clustering-and-hierarchical-organization" title="Link to this heading">¶</a></h2>
-<p>After generating topics across multiple runs, GeneInsight performs secondary clustering to:
-1. Ensure biological distinctiveness of themes
-2. Create a hierarchical organization for user navigation</p>
-<p>The process:
-1. Computes semantic similarity between topic pairs
-2. Applies hierarchical clustering to identify topic groups
-3. Selects representative topics from each cluster</p>
-<p>Cluster quality is evaluated using:
-* <strong>Davies-Bouldin Index</strong>: Measuring average similarity between clusters
-* <strong>Calinski-Harabasz Score</strong>: Evaluating cluster separation</p>
-<p>This hierarchical organization helps users:
-* Explore major biological themes at the top level
-* Drill down into related sub-themes
-* Navigate between connected concepts
-* Locate specific biological processes efficiently</p>
+<p>After generating topics across multiple runs, GeneInsight performs secondary clustering to:</p>
+<ol class="arabic simple">
+<li><p>Ensure biological distinctiveness of themes</p></li>
+<li><p>Create a hierarchical organization for user navigation</p></li>
+</ol>
+<p>The process:</p>
+<ol class="arabic simple">
+<li><p>Computes semantic similarity between topic pairs</p></li>
+<li><p>Applies hierarchical clustering to identify topic groups</p></li>
+<li><p>Selects representative topics from each cluster</p></li>
+</ol>
+<p>Cluster quality is evaluated using:</p>
+<ul class="simple">
+<li><p><strong>Davies-Bouldin Index</strong>: Measuring average similarity between clusters</p></li>
+<li><p><strong>Calinski-Harabasz Score</strong>: Evaluating cluster separation</p></li>
+</ul>
+<p>This hierarchical organization helps users:</p>
+<ul class="simple">
+<li><p>Explore major biological themes at the top level</p></li>
+<li><p>Drill down into related sub-themes</p></li>
+<li><p>Navigate between connected concepts</p></li>
+<li><p>Locate specific biological processes efficiently</p></li>
+</ul>
 <p>This structure transforms a flat list of terms into an organized knowledge framework reflecting the natural hierarchy of biological processes.</p>
 </section>
 <section id="downstream-enrichment-analysis">
@@ -334,7 +342,7 @@
 <li><p>False discovery rate correction controls for multiple testing</p></li>
 <li><p>Enriched themes provide meaningful biological interpretation of the gene set</p></li>
 </ol>
-<p>This approach produces human-readable summaries in the HTML report, with the LLM translating statistical findings into clear insights that biologists can readily understand and apply.</p>
+<p>This approach produces human-readable summaries in the HTML report, with the LLM translating findings into clear insights that biologists can readily understand and apply.</p>
 </section>
 </section>
 

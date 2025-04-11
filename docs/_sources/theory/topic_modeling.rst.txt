@@ -52,19 +52,23 @@ Topic Clustering and Hierarchical Organization
 ----------------------------------------------
 
 After generating topics across multiple runs, GeneInsight performs secondary clustering to:
+
 1. Ensure biological distinctiveness of themes
 2. Create a hierarchical organization for user navigation
 
 The process:
+
 1. Computes semantic similarity between topic pairs
 2. Applies hierarchical clustering to identify topic groups
 3. Selects representative topics from each cluster
 
 Cluster quality is evaluated using:
+
 * **Davies-Bouldin Index**: Measuring average similarity between clusters
 * **Calinski-Harabasz Score**: Evaluating cluster separation
 
 This hierarchical organization helps users:
+
 * Explore major biological themes at the top level
 * Drill down into related sub-themes
 * Navigate between connected concepts
@@ -82,4 +86,4 @@ The LLM-generated themes form the foundation for enrichment analysis:
 3. False discovery rate correction controls for multiple testing
 4. Enriched themes provide meaningful biological interpretation of the gene set
 
-This approach produces human-readable summaries in the HTML report, with the LLM translating statistical findings into clear insights that biologists can readily understand and apply.
+This approach produces human-readable summaries in the HTML report, with the LLM translating findings into clear insights that biologists can readily understand and apply.

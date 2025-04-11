@@ -412,21 +412,49 @@
 <h2>Understanding the Output<a class="headerlink" href="#understanding-the-output" title="Link to this heading">¶</a></h2>
 <p>The HTML report includes:</p>
 <ol class="arabic simple">
-<li><p><strong>Interactive Topic Map</strong>: A visual representation of identified biological themes</p></li>
+<li><p><strong>Topic Map</strong>: A visual representation of identified biological themes</p></li>
 </ol>
-<a class="reference internal image-reference" href="../_images/embedding_map.png"><img alt="Interactive topic map showing biological themes as a 2D embedding" src="../_images/embedding_map.png" style="width: 600px;" />
+<a class="reference internal image-reference" href="../_images/embedding_map.png"><img alt="Topic map showing biological themes as a 2D embedding" src="../_images/embedding_map.png" style="width: 600px;" />
 </a>
+<p>The topic map allows you to intuitively see larger groups of related biological themes without having to manually cross-reference multiple ontologies. Themes that appear close together in the visualization share biological meaning, functional relationships, or relevance to similar biological processes, even if they come from different ontology sources.</p>
+<p>This visualization is particularly valuable for identifying unexpected relationships between biological themes that might not be apparent when examining individual ontology terms in isolation.</p>
 <ol class="arabic simple" start="2">
 <li><p><strong>Gene Set Visualizations</strong>: Heatmaps showing gene presence across references</p></li>
 </ol>
 <a class="reference internal image-reference" href="../_images/heatmap.png"><img alt="Heatmap visualization of gene set patterns" src="../_images/heatmap.png" style="width: 600px;" />
 </a>
+<p>These heatmaps are particularly useful for:</p>
+<ol class="arabic simple">
+<li><p>Identifying which genes contribute most strongly to specific biological themes</p></li>
+<li><p>Discovering how terms from commonly used ontologies (GO, HPO) relate to each other through shared gene associations</p></li>
+<li><p>Finding unexpected gene-theme associations that might suggest novel biological functions</p></li>
+<li><p>Prioritizing genes for experimental validation based on their prominence across multiple themes</p></li>
+</ol>
+<p>The hierarchical clustering of both genes and themes helps reveal patterns that might not be obvious when examining individual gene-theme pairs, providing a systems-level view of the biological relationships in your data.</p>
 <ol class="arabic simple" start="3">
 <li><p><strong>Theme Pages and Gene-Level Information</strong>: Detailed exploration of each identified theme</p></li>
 </ol>
 <a class="reference internal image-reference" href="../_images/theme_page.png"><img alt="Example theme page showing related genes and pathways" src="../_images/theme_page.png" style="width: 600px;" />
 </a>
-<p>For information on how to get started with GeneInsight, please refer to the <a class="reference internal" href="../getting_started.html"><span class="doc">Getting Started</span></a> guide.</p>
+<p>These detailed theme pages serve as comprehensive reference sheets for each biological theme identified in your analysis. They bring together information that would otherwise require searching across multiple databases and resources.</p>
+<p>The theme pages consolidate:</p>
+<ol class="arabic simple">
+<li><p>Detailed enrichment information for each biological theme</p></li>
+<li><p>STRING-DB annotations for associated genes</p></li>
+<li><p>Ontology annotations across different systems (GO, HPO)</p></li>
+</ol>
+<p>Additionally, the integration with NCBI’s API provides gene descriptions directly within the report. This consolidation of information allows researchers to quickly assess the biological relevance of each theme and its associated genes without having to manually search across multiple resources.</p>
+</section>
+<section id="practical-applications">
+<h2>Practical Applications<a class="headerlink" href="#practical-applications" title="Link to this heading">¶</a></h2>
+<p>This integrated report is designed to support several common research workflows:</p>
+<ol class="arabic simple">
+<li><p><strong>Hypothesis Generation</strong>: Identify unexpected relationships between genes and biological processes that may suggest novel mechanisms</p></li>
+<li><p><strong>Candidate Prioritization</strong>: Rank genes for experimental validation based on their prominence across multiple biological themes</p></li>
+<li><p><strong>Pathway Analysis</strong>: Understand how genes of interest relate to established biological pathways and functions</p></li>
+<li><p><strong>Cross-Ontology Interpretation</strong>: Bridge the gap between different ontology frameworks (GO, HPO) through their shared gene associations</p></li>
+<li><p><strong>Data Integration</strong>: Combine your experimental findings with established knowledge from public databases</p></li>
+</ol>
 </section>
 </section>
 
@@ -507,6 +535,7 @@
 </li>
 <li><a class="reference internal" href="#exploring-the-results">Exploring the Results</a></li>
 <li><a class="reference internal" href="#understanding-the-output">Understanding the Output</a></li>
+<li><a class="reference internal" href="#practical-applications">Practical Applications</a></li>
 </ul>
 </li>
 </ul>

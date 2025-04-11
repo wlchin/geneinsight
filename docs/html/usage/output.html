@@ -3,7 +3,7 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Theoretical Background" href="../theory/index.html" /><link rel="prev" title="API Support" href="api.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Interpretation of Results" href="results.html" /><link rel="prev" title="API Support" href="api.html" />
 
     <!-- Generated with Sphinx 8.1.3 and Furo 2024.08.06 -->
         <title>Output Format - GeneInsight 0.1.0 documentation</title>
@@ -205,6 +205,7 @@
 <li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Usage</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Usage</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="api.html">API Support</a></li>
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Output Format</a></li>
+<li class="toctree-l2"><a class="reference internal" href="results.html">Interpretation of Results</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../theory/index.html">Theoretical Background</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of Theoretical Background</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
@@ -408,54 +409,6 @@
 <li><p><strong>ZIP Archive</strong>: A compressed version of all outputs for easy sharing</p></li>
 </ul>
 </section>
-<section id="understanding-the-output">
-<h2>Understanding the Output<a class="headerlink" href="#understanding-the-output" title="Link to this heading">¶</a></h2>
-<p>The HTML report includes:</p>
-<ol class="arabic simple">
-<li><p><strong>Topic Map</strong>: A visual representation of identified biological themes</p></li>
-</ol>
-<a class="reference internal image-reference" href="../_images/embedding_map.png"><img alt="Topic map showing biological themes as a 2D embedding" src="../_images/embedding_map.png" style="width: 600px;" />
-</a>
-<p>The topic map allows you to intuitively see larger groups of related biological themes without having to manually cross-reference multiple ontologies. Themes that appear close together in the visualization share biological meaning, functional relationships, or relevance to similar biological processes, even if they come from different ontology sources.</p>
-<p>This visualization is particularly valuable for identifying unexpected relationships between biological themes that might not be apparent when examining individual ontology terms in isolation.</p>
-<ol class="arabic simple" start="2">
-<li><p><strong>Gene Set Visualizations</strong>: Heatmaps showing gene presence across references</p></li>
-</ol>
-<a class="reference internal image-reference" href="../_images/heatmap.png"><img alt="Heatmap visualization of gene set patterns" src="../_images/heatmap.png" style="width: 600px;" />
-</a>
-<p>These heatmaps are particularly useful for:</p>
-<ol class="arabic simple">
-<li><p>Identifying which genes contribute most strongly to specific biological themes</p></li>
-<li><p>Discovering how terms from commonly used ontologies (GO, HPO) relate to each other through shared gene associations</p></li>
-<li><p>Finding unexpected gene-theme associations that might suggest novel biological functions</p></li>
-<li><p>Prioritizing genes for experimental validation based on their prominence across multiple themes</p></li>
-</ol>
-<p>The hierarchical clustering of both genes and themes helps reveal patterns that might not be obvious when examining individual gene-theme pairs, providing a systems-level view of the biological relationships in your data.</p>
-<ol class="arabic simple" start="3">
-<li><p><strong>Theme Pages and Gene-Level Information</strong>: Detailed exploration of each identified theme</p></li>
-</ol>
-<a class="reference internal image-reference" href="../_images/theme_page.png"><img alt="Example theme page showing related genes and pathways" src="../_images/theme_page.png" style="width: 600px;" />
-</a>
-<p>These detailed theme pages serve as comprehensive reference sheets for each biological theme identified in your analysis. They bring together information that would otherwise require searching across multiple databases and resources.</p>
-<p>The theme pages consolidate:</p>
-<ol class="arabic simple">
-<li><p>Detailed enrichment information for each biological theme</p></li>
-<li><p>STRING-DB annotations for associated genes</p></li>
-<li><p>Ontology annotations across different systems (GO, HPO)</p></li>
-</ol>
-<p>Additionally, the integration with NCBI’s API provides gene descriptions directly within the report. This consolidation of information allows researchers to quickly assess the biological relevance of each theme and its associated genes without having to manually search across multiple resources.</p>
-</section>
-<section id="practical-applications">
-<h2>Practical Applications<a class="headerlink" href="#practical-applications" title="Link to this heading">¶</a></h2>
-<p>This integrated report is designed to support several common research workflows:</p>
-<ol class="arabic simple">
-<li><p><strong>Hypothesis Generation</strong>: Identify unexpected relationships between genes and biological processes that may suggest novel mechanisms</p></li>
-<li><p><strong>Candidate Prioritization</strong>: Rank genes for experimental validation based on their prominence across multiple biological themes</p></li>
-<li><p><strong>Pathway Analysis</strong>: Understand how genes of interest relate to established biological pathways and functions</p></li>
-<li><p><strong>Cross-Ontology Interpretation</strong>: Bridge the gap between different ontology frameworks (GO, HPO) through their shared gene associations</p></li>
-<li><p><strong>Data Integration</strong>: Combine your experimental findings with established knowledge from public databases</p></li>
-</ol>
-</section>
 </section>
 
         </article>
@@ -463,12 +416,12 @@
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="../theory/index.html">
+          <a class="next-page" href="results.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Theoretical Background</div>
+                <div class="title">Interpretation of Results</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -534,8 +487,6 @@
 </ul>
 </li>
 <li><a class="reference internal" href="#exploring-the-results">Exploring the Results</a></li>
-<li><a class="reference internal" href="#understanding-the-output">Understanding the Output</a></li>
-<li><a class="reference internal" href="#practical-applications">Practical Applications</a></li>
 </ul>
 </li>
 </ul>

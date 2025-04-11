@@ -1,0 +1,55 @@
+System Architecture
+===================
+
+GeneInsight employs a two-stage approach to extract and organize biological information from gene sets.
+
+.. figure:: /_static/GeneInsight.png
+   :alt: GeneInsight system architecture and workflow
+   :width: 600px
+
+   Figure 1: GeneInsight system architecture and workflow
+
+Biological Theme Generation Stage
+--------------------------------
+
+1. **Annotation Collection**:
+   The system collects functional annotations from the STRING database for each input gene, creating a collection of gene-specific descriptions.
+
+2. **Cluster-based Topic Modeling**:
+   This textual corpus is subjected to cluster-based topic modeling, which groups similar annotations into clusters (topics) and identifies key terms for each cluster.
+
+3. **LLM Theme Generation**:
+   A large language model (LLM) then converts representative annotations from each cluster into interpretable biological themes.
+
+4. **Gene-Theme Linking**:
+   These biological themes are linked back to genes via their associated descriptions.
+
+5. **Statistical Validation**:
+   The system performs hypergeometric testing with false discovery rate correction to identify which biological concepts are significantly enriched within the original gene set.
+
+Summarization Stage
+-----------------
+
+1. **Theme Refinement**:
+   Another round of cluster-based topic modeling identifies key themes, measuring how consistently they appear as cluster representatives across multiple runs.
+
+2. **Hierarchical Structuring**:
+   The software extracts the final summary by selecting themes based on user-defined length preferences.
+
+3. **Interactive Report Generation**:
+   A large language model creates a hierarchical summary where major biological themes appear as main headings with related subheadings grouped beneath them.
+
+4. **Cross-reference Integration**:
+   The final interactive HTML report seamlessly links theme descriptions to their corresponding gene annotations, enabling researchers to navigate between overarching biological processes and their specific components.
+
+Technical Implementation
+----------------------
+
+GeneInsight is implemented in Python (3.9+) and distributed as a Docker container to ensure reproducible deployment across platforms. The core computational components include:
+
+* **BERTopic (v0.15.0)** for topic modeling
+* **SentenceTransformer** for generating dense vector representations
+* **Optuna (v3.3.0)** for hyperparameter optimization
+* **Snakemake (v7.32.4)** for workflow management
+
+The system employs multiple rounds of topic modeling with different random seeds to ensure robust theme identification, identifying stable topics through cosine similarity measurements between iterations.

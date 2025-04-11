@@ -1,0 +1,38 @@
+Interpretation of Results
+=========================
+
+The analysis pipeline generates an integrated visualization framework that bridges multiple ontologies and reveals biological relationships at varying resolutions. This approach facilitates rapid interpretation of high-dimensional genomic data through complementary visual representations, enabling researchers to identify functional patterns, gene-phenotype relationships, and potential therapeutic targets with enhanced efficiency compared to traditional ontology analyses.
+
+
+Topic Map
+~~~~~~~~~
+
+.. image:: ../_static/embedding_map.png
+   :width: 400
+   :alt: Topic map showing biological themes as a 2D embedding
+   :class: with-border
+   :align: center
+
+The topic map presents biological themes as an intuitive two-dimensional embedding where spatial proximity reflects functional similarity. This visualization transcends traditional ontology boundaries, revealing conceptual relationships between terms regardless of their source database. Themes clustering together often indicate shared biological mechanisms or involvement in related cellular processes, while distant clusters represent functionally distinct domains. The map successfully captures both established biological relationships and occasionally highlights unexpected connections that may suggest novel functional interactions. This approach effectively condenses complex multi-ontology relationships into an accessible format, enabling researchers to rapidly identify relevant biological themes without manual cross-referencing across disparate knowledge bases.
+
+Gene Set Visualizations
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. image:: ../_static/heatmap.png
+   :width: 400
+   :alt: Heatmap visualization of gene set patterns
+   :class: with-border
+   :align: center
+
+The hierarchically clustered heatmaps provide quantitative visualization of gene-theme associations, revealing coordinated expression patterns and functional relationships. Through bidirectional clustering, the heatmaps expose groups of genes with shared involvement across multiple biological processes and conversely, identify biological themes linked by common genetic components. This visualization effectively bridges disparate ontology frameworks through their shared gene associations, making it possible to directly compare terms across GO, HPO, and other classification systems based on their genetic signatures rather than semantic definitions. Gene prominence across multiple themes often indicates central regulatory roles, offering an empirical basis for prioritizing candidates for further experimental investigation.
+
+Theme Pages and Gene-Level Information
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. image:: ../_static/theme_page.png
+   :width: 400
+   :alt: Example theme page showing related genes and pathways
+   :class: with-border
+   :align: center
+
+The theme-specific pages provide detailed contextual information for each biological process identified in the analysis. Each page integrates enrichment statistics with functional annotations from STRING-DB, relevant ontology cross-references, and NCBI gene descriptions accessed through API integration. This comprehensive presentation enables researchers to efficiently evaluate the biological significance of each theme without navigating multiple external resources. The integrated view offers immediate access to the supporting evidence underlying each gene-theme association, including pathway memberships, protein interaction networks, and relevant literature. These detailed pages serve as self-contained reference sheets that consolidate distributed knowledge into a coherent biological narrative for each identified theme.

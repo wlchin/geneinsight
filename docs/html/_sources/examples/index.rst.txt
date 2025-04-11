@@ -1,0 +1,10 @@
+Examples and Case Studies
+=========================
+
+This section provides examples and case studies demonstrating GeneInsight's capabilities.
+
+.. toctree::
+   :maxdepth: 2
+
+   basic
+   advanced

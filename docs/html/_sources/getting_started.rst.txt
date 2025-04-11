@@ -1,0 +1,49 @@
+Getting Started
+==============
+
+Basic Usage
+----------
+This guide will help you quickly get started with GeneInsight for gene set analysis.
+
+Input Files
+^^^^^^^^^^
+GeneInsight requires two input files:
+
+1. **Query Gene Set**: A text file containing the genes of interest (one gene ID per line)
+2. **Background Gene Set**: A text file containing a background set of genes for statistical comparison
+
+Example Files
+^^^^^^^^^^^
+You can generate example files using the built-in utility:
+
+.. code-block:: bash
+
+   # Create an examples folder in your current directory
+   geneinsight-examples
+   
+   # Or specify a custom destination
+   geneinsight-examples --path /path/to/destination
+
+Running Your First Analysis
+-------------------------
+Using the example files:
+
+.. code-block:: bash
+
+   geneinsight examples/sample.txt examples/sample_background.txt -o ./output
+
+This will:
+
+1. Process the query and background gene sets
+2. Retrieve annotations from the STRING database
+3. Perform topic modeling to identify biological themes
+4. Apply statistical enrichment analysis
+5. Generate an interactive HTML report
+
+For detailed information about the output files and visualization, please refer to the :doc:`usage/output` documentation.
+
+Next Steps
+---------
+* Try running GeneInsight with different parameter settings
+* Explore the case studies in the Examples section
+* Refer to the Usage documentation for advanced options

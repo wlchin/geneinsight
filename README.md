@@ -6,6 +6,8 @@
 
 A Python package for topic modeling of gene sets with enrichment analysis.
 
+Geneinsight uses AI language models to make sense of complex gene data, helping scientists uncover hidden patterns and biological themes in their genomic research without requiring advanced computational expertise.
+
 ## Overview
 
 Geneinsight provides a comprehensive pipeline for analyzing gene sets through topic modeling and enrichment analysis:
@@ -284,7 +286,7 @@ Key workflows include:
 - Hyperparameter optimization
 - Test set evaluation
 - Visualization generation
-- Cosine similarity and mover's score calculation
+- Cosine similarity and MoverScore calculation
 
 ## External Resources
 
@@ -292,6 +294,7 @@ Geneinsight integrates with several external resources:
 
 - **[STRING-DB](https://string-db.org/)**: Used for protein-protein interaction network analysis and functional enrichment of gene sets
 - **[NCBI](https://www.ncbi.nlm.nih.gov/)** (National Center for Biotechnology Information): Used for retrieving gene annotations and taxonomy information
+- **[BERTopic](https://maartengr.github.io/BERTopic/index.html)**: The core topic modeling framework that powers Geneinsight's ability to discover themes in gene sets
 
 ## License
 

@@ -40,6 +40,8 @@ The documentation includes detailed API references, examples, and advanced usage
 - [Output Format](#output-format)
 - [Interactive Report](#interactive-report)
 - [Examples](#examples)
+- [Reproducibility](#reproducibility)
+- [External Resources](#external-resources)
 - [License](#license)
 
 ## Installation
@@ -273,6 +275,23 @@ For a quick start, try running:
 ```bash
 geneinsight examples/sample.txt examples/sample_background.txt -o ./output
 ```
+
+## Reproducibility
+
+The scripts used to reproduce the results presented in the manuscript are available as [Snakemake](https://snakemake.readthedocs.io/en/stable/) workflows in the `reproducibility` folder. These workflows ensure complete reproducibility of our analyses and can be easily adapted for similar studies.
+
+Key workflows include:
+- Hyperparameter optimization
+- Test set evaluation
+- Visualization generation
+- Cosine similarity and mover's score calculation
+
+## External Resources
+
+Geneinsight integrates with several external resources:
+
+- **[STRING-DB](https://string-db.org/)**: Used for protein-protein interaction network analysis and functional enrichment of gene sets
+- **[NCBI](https://www.ncbi.nlm.nih.gov/)** (National Center for Biotechnology Information): Used for retrieving gene annotations and taxonomy information
 
 ## License
 

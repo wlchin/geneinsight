@@ -1,0 +1,278 @@
+import glob
+
+gene_sets = glob.glob("data/1000geneset_benchmark/results/summary/*.csv")
+gene_sets = [gs.split("/")[-1].replace(".csv", "") for gs in gene_sets]
+
+SIZES = ["25", "50", "75", "100"]
+METRICS = ["cosine", "mover"]
+
+rule all:
+    input:
+        "results/filtered_vs_enrichment_thresholds.png",
+        "results/combined_figure.png",
+
+rule process_cosine_scores:
+    input:
+        expand("data/topk_data/cosine_score_results_{size}.csv", size=[25, 50, 75, 100])
+    output:
+        csv="results/cosine_score.csv",
+        md="results/cosine_score.md"
+    shell:
+        """
+        python scripts/process_scores.py \
+            --folder data/topk_data \
+            --pattern "cosine_score_results_*.csv" \
+            --output {output.md} \
+            --csv {output.csv}
+        """
+
+rule process_mover_scores:
+    input:
+        expand("data/topk_data/mover_score_results_{size}.csv", size=[25, 50, 75, 100])
+    output:
+        csv="results/mover_score.csv",
+        md="results/mover_score.md"
+    shell:
+        """
+        python scripts/process_scores.py \
+            --folder data/topk_data \
+            --pattern "mover_score_results_*.csv" \
+            --output {output.md} \
+            --csv {output.csv}
+        """
+
+rule generate_threshold_figures_Fig1_S1:
+    input:
+        filtered_sets = directory("data/1000geneset_benchmark/results/filtered_sets"),
+        enrichment_data = directory("data/1000geneset_benchmark/results/enrichment_df_listmode")
+    output:
+        threshold_figure = "results/filtered_vs_enrichment_thresholds.pdf",
+        threshold_figure_png = "results/filtered_vs_enrichment_thresholds.png",
+        threshold_stats = "results/threshold_statistics.csv"
+    shell:
+        """
+        python scripts/threshold_plot_script.py \
+            --filtered_dir {input.filtered_sets} \
+            --enrichment_dir {input.enrichment_data} \
+            --output_dir results
+        """
+
+rule calculate_correlations:
+    input:
+        folder = directory("data/topk_data")
+    output:
+        csv = "results/correlation_analysis.csv"
+    shell:
+        """
+        python scripts/compute_correlations.py \
+            --folder {input.folder} \
+            --mover_pattern "mover_score_results_*.csv" \
+            --cosine_pattern "cosine_score_results_*.csv" \
+            --output {output.csv}
+        """
+
+rule compute_average_distances:
+    input:
+        lambda wildcards: expand("data/1000geneset_benchmark/results/filtered_topics/samp_{N}/{gene_set}_filtered_topics.csv",
+                                  gene_set=gene_sets,
+                                  N=wildcards.N)
+    output:
+        csv="results/avg_distances_stats_{N}.csv",
+        distances="results/avg_distances_{N}.csv"
+    params:
+        sets_dir="data/1000geneset_benchmark/results/filtered_sets",
+        topics_dir=lambda wildcards: f"data/1000geneset_benchmark/results/filtered_topics/samp_{wildcards.N}",
+        enrichment_dir="data/1000geneset_benchmark/results/enrichment_df_listmode",
+        max_gene_sets=1000,
+        model_name="all-MiniLM-L6-v2"
+    shell:
+        """
+        python scripts/vector_embedding_distances.py \
+            --sets_dir {params.sets_dir} \
+            --topics_dir {params.topics_dir} \
+            --enrichment_dir {params.enrichment_dir} \
+            --max_gene_sets {params.max_gene_sets} \
+            --model_name {params.model_name} \
+            --output_stats_csv {output.csv} \
+            --output_distances_csv {output.distances}
+        """
+
+rule compute_soft_cardinality:
+    input:
+        lambda wildcards: expand("data/1000geneset_benchmark/results/filtered_topics/samp_{n}/{gene_set}_filtered_topics.csv",
+                                 n=[wildcards.n],
+                                 gene_set=gene_sets)
+    output:
+        "results/compute_soft_cardinality/soft_cardinality_{n}_{thresh}.csv"
+    params:
+        model_name="all-MiniLM-L6-v2",
+        similarity_model_name="paraphrase-MiniLM-L6-v2",
+        sets_dir="data/1000geneset_benchmark/results/filtered_sets",
+        enrichment_dir="data/1000geneset_benchmark/results/enrichment_df_listmode"
+    run:
+        threshold_value = "0." + wildcards.thresh
+        topics_dir = f"data/1000geneset_benchmark/results/filtered_topics/samp_{wildcards.n}"
+        shell(
+            "python scripts/soft_cardinality.py "
+            "--sets_dir {params.sets_dir} "
+            "--topics_dir {topics_dir} "
+            "--enrichment_dir {params.enrichment_dir} "
+            "--output_csv {output} "
+            "--model_name {params.model_name} "
+            "--similarity_model_name {params.similarity_model_name} "
+            "--threshold {threshold_value}"
+        )
+
+rule process_pairwise_data_fig2A:
+    input:
+        filtered_sets = directory("data/1000geneset_benchmark/results/filtered_sets"),
+        enrichment_data = directory("data/1000geneset_benchmark/results/enrichment_df_listmode")
+    output:
+        data_csv = "results/data_filtered_vs_enrichment.csv",
+        combined_csv = "results/all_pairwise_comparisons.csv"
+    shell:
+        """
+        python scripts/process_pairwise_data.py \
+            --filtered_dir {input.filtered_sets} \
+            --enrichment_dir {input.enrichment_data} \
+            --output_dir results
+        """
+
+rule process_stringdb_overlap_data:
+    input:
+        script = "scripts/process_overlap_data.py",
+        csv_files = [
+            "results/compute_soft_cardinality/soft_cardinality_100_6.csv",
+            "results/compute_soft_cardinality/soft_cardinality_100_7.csv",
+            "results/compute_soft_cardinality/soft_cardinality_100_8.csv",
+            "results/compute_soft_cardinality/soft_cardinality_100_9.csv"
+        ]
+    output:
+        json = "results/processed_data/stringdb_overlap_data.json"
+    shell:
+        """
+        python {input.script}
+        """
+
+rule generate_pairwise_plots_Fig2A:
+    input:
+        data_csv = "results/data_filtered_vs_enrichment.csv",
+        combined_csv = "results/all_pairwise_comparisons.csv"
+    output:
+        scatter_plot = "results/scatter_filtered_vs_enrichment.pdf",
+        scatter_plot_png = "results/scatter_filtered_vs_enrichment.png"
+    shell:
+        """
+        python scripts/pairwise_plot_script.py --output_dir results
+        """
+
+rule plot_stringdb_overlap_Fig2B:
+    input:
+        data = "results/processed_data/stringdb_overlap_data.json"
+    output:
+        png = "results/stringdb_overlap_plot.png",
+        svg = "results/stringdb_overlap_plot.svg"
+    shell:
+        """
+        python scripts/plot_overlap.py --input {input.data} --output-png {output.png} --output-svg {output.svg}
+        """
+
+rule create_violin_plot_Fig2C:
+    input:
+        csv_file = "results/avg_distances_100.csv"
+    output:
+        plot = "figures/violin_plot_100.png"
+    params:
+        dpi = 600
+    shell:
+        """
+        mkdir -p figures
+        python scripts/plot_violin.py --csv_file {input.csv_file} --output_file {output.plot} --dpi {params.dpi}
+        """
+
+rule generate_plots_Fig2D:
+    input:
+        cosine="results/cosine_score.csv"
+    output:
+        cosine_png="results/cosine_score_comparison.png",
+        cosine_pdf="results/cosine_score_comparison.pdf",
+        cosine_svg="results/cosine_score_comparison.svg"
+    shell:
+        """
+        python scripts/cosine_plot_script.py \
+            --cosine {input.cosine} \
+            --output results/cosine_score_comparison
+        """
+
+rule generate_plots_Fig2E:
+    input:
+        mover="results/mover_score.csv"
+    output:
+        mover_png="results/mover_score_comparison.png",
+        mover_pdf="results/mover_score_comparison.pdf",
+        mover_svg="results/mover_score_comparison.svg"
+    shell:
+        """
+        python scripts/mover_plot_script.py \
+            --mover {input.mover} \
+            --output results/mover_score_comparison
+        """
+
+rule create_pearson_barchart_Fig2F:
+    input:
+        csv = "results/correlation_analysis.csv"
+    output:
+        figure = "results/pearson_barchart.png"
+    params:
+        dpi = 300,
+        width = 6,
+        height = 5
+    shell:
+        """
+        python scripts/pearson_barchart.py \
+            --input {input.csv} \
+            --output {output.figure} \
+            --dpi {params.dpi} \
+            --width {params.width} \
+            --height {params.height}
+        """
+
+rule plot_topk_data_Fig2G:
+    input:
+        "data/topk_data/cosine_score_results_100.csv"
+    output:
+        pdf="results/plots/cosine_score_results_100.pdf",
+        png="results/plots/cosine_score_results_100.png"
+    params:
+        title="Cosine Score Results (Size: 100)",
+        column_name="recall_cosine"
+    shell:
+        """
+        mkdir -p results/plots
+        python scripts/plot_top_k.py \
+            --input {input} \
+            --output-pdf {output.pdf} \
+            --output-png {output.png} \
+            --title "{params.title}" \
+            --metric-column {params.column_name}
+        """
+
+rule create_combined_figure:
+    input:
+        pairwise_data = "results/data_filtered_vs_enrichment.csv",
+        stringdb_data = "results/processed_data/stringdb_overlap_data.json",
+        violin_data = "results/avg_distances_100.csv",
+        cosine_data = "results/cosine_score.csv",
+        mover_data = "results/mover_score.csv",
+        pearson_data = "results/correlation_analysis.csv",
+        topk_data = "data/topk_data/cosine_score_results_100.csv",
+        script = "scripts/combined_figure.py"
+    output:
+        png = "results/combined_figure.png",
+        pdf = "results/combined_figure.pdf"
+    log:
+        "logs/combined_figure.log"
+    shell:
+        """
+        python {input.script} 2>&1 | tee {log}
+        """

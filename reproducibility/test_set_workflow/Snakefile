@@ -1,0 +1,234 @@
+import glob
+
+# Define gene_set names based on the final summary CSVs.
+gene_sets = glob.glob("results/summary/*.csv")
+gene_sets = [gs.split("/")[-1].replace(".csv", "") for gs in gene_sets]
+
+rule all:
+    input:
+        expand("results/minor_topics/{gene_set}_minor_topics.csv", gene_set=gene_sets),
+        expand("results/summary/{gene_set}.csv", gene_set=gene_sets),
+        expand("results/filtered_sets/{gene_set}_filtered_gene_sets.csv", gene_set=gene_sets),
+        expand("results/resampled_topics/{gene_set}_final_topic_modeling_results.csv", gene_set=gene_sets),
+        expand("results/key_topics/{gene_set}_key_topics.csv", gene_set=gene_sets),
+        expand("results/filtered_topics/samp_25/{gene_set}_filtered_topics.csv", gene_set=gene_sets),
+        expand("results/filtered_topics/samp_50/{gene_set}_filtered_topics.csv", gene_set=gene_sets),
+        expand("results/filtered_topics/samp_75/{gene_set}_filtered_topics.csv", gene_set=gene_sets),
+        expand("results/filtered_topics/samp_100/{gene_set}_filtered_topics.csv", gene_set=gene_sets)
+
+rule get_stringdb_genes:
+    input:
+        "data/test_gene_sets/sampled_gene_sets/{gene_set}.txt"
+    output:
+        "results/enrichment_df_testset/{gene_set}__documents.csv",
+        "results/enrichment_df_testset/{gene_set}__enrichment.csv"
+    shell:
+        "python scripts/stringdb_retrieval.py --input {input} --output_dir results/enrichment_df_testset/"
+
+rule get_stringdb_genes_in_list:
+    """
+    Retrieves STRINGdb data using the "list" mode for a given gene set and writes documents/enrichment CSVs.
+    """
+    input:
+        "data/test_gene_sets/sampled_gene_sets/{gene_set}.txt"
+    output:
+        "results/enrichment_df_listmode/{gene_set}__documents.csv"
+    shell:
+        """
+        python scripts/stringdb_retrieval.py \
+            --input {input} \
+            --mode list \
+            --output_dir results/enrichment_df_listmode/
+        """
+
+rule get_topic_model:
+    """
+    Generates multiple topic-model outputs (different seeds and n_samples)
+    for each gene set's documents.
+    Enforces only one instance running at a time via 'modelslot=1'.
+    """
+    input:
+        "results/enrichment_df_testset/{gene_set}__documents.csv"
+    output:
+        "results/topics_for_genelists/{gene_set}_topic_model.csv"
+    resources:
+        modelslot=1
+    shell:
+        """
+        python scripts/topic_modelling.py \
+            --input_file {input} \
+            --output_file {output} \
+            --seed_value 0 \
+            --n_samples 5
+        """
+
+rule generate_prompts_for_minor_topics:
+    """
+    Generates prompts CSV from topic model outputs (no API calls).
+    """
+    input:
+        "results/topics_for_genelists/{gene_set}_topic_model.csv"
+    output:
+        "results/prompts_for_minor_topics/{gene_set}_prompts.csv"
+    resources:
+        modelslot=1 
+    shell:
+        """
+        python scripts/generate_prompts.py \
+            --input {input} \
+            --num_subtopics 5 \
+            --max_words 10 \
+            --output_prompts {output} \
+            --max_retries 5
+        """
+
+rule call_api_for_minor_topics:
+    """
+    Consumes the prompts CSV, calls the API, and outputs the final minor topics CSV.
+    """
+    input:
+        "results/prompts_for_minor_topics/{gene_set}_prompts.csv"
+    output:
+        "results/minor_topics/{gene_set}_minor_topics.csv"
+    shell:
+        """
+        python scripts/call_api_combined_batch.py \
+            --prompts_csv {input} \
+            --output_api {output} \
+            --n_job 20
+        """
+
+rule get_summary:
+    """
+    Generates a summary of the topic model output.
+    """
+    input:
+        minor_topic = "results/minor_topics/{gene_set}_minor_topics.csv",
+        enrichment  = "results/enrichment_df_testset/{gene_set}__enrichment.csv"
+    output:
+        "results/summary/{gene_set}.csv"
+    resources:
+        modelslot=1
+    shell:
+        """
+        python scripts/get_summary.py \
+            --enrichment_csv {input.enrichment} \
+            --minor_topics_csv {input.minor_topic} \
+            --output_csv {output}
+        """
+
+rule get_filtered_genesets:
+    """
+    Filters gene sets using hypergeometric enrichment analysis.
+    """
+    input:
+        df            = "results/summary/{gene_set}.csv",
+        gene_origin   = "data/test_gene_sets/sampled_gene_sets/{gene_set}.txt",
+        background_genes = "data/background.txt"
+    output:
+        "results/filtered_sets/{gene_set}_filtered_gene_sets.csv"
+    shell:
+        """
+        python scripts/calculate_hypergeometric_enrichment.py \
+            --df {input.df} \
+            --gene_origin {input.gene_origin} \
+            --background_genes {input.background_genes} \
+            --output_csv {output}
+        """
+
+rule topic_model_on_topic_model:
+    """
+    Runs topic modeling on the filtered gene sets.
+    """
+    input:
+        filtered_sets="results/filtered_sets/{gene_set}_filtered_gene_sets.csv"
+    output:
+        "results/resampled_topics/{gene_set}_final_topic_modeling_results.csv"
+    resources:
+        modelslot=1
+    shell:
+        """
+        python scripts/final_main_topics_for_model_on_model.py \
+            --input_file {input.filtered_sets} \
+            --output_file {output} \
+            --n_samples 10
+        """
+
+rule get_key_topics:
+    """
+    Counts the top terms in the final topic modeling results.
+    """
+    input:
+        resampled_topics="results/resampled_topics/{gene_set}_final_topic_modeling_results.csv"
+    output:
+        "results/key_topics/{gene_set}_key_topics.csv"
+    shell:
+        """
+        python scripts/count_top_topics.py \
+            {input.resampled_topics} \
+            {output}
+        """
+
+rule filter_by_sim:
+    """
+    Filter the key topics by similarity (threshold 50).
+    """
+    input:
+        key_topics="results/key_topics/{gene_set}_key_topics.csv"
+    output:
+        "results/filtered_topics/samp_50/{gene_set}_filtered_topics.csv"
+    shell:
+        """
+        python scripts/filter_by_sim.py \
+            {input.key_topics} \
+            {output} \
+            50
+        """
+
+rule filter_by_sim_25:
+    """
+    Filter the key topics by similarity (threshold 25).
+    """
+    input:
+        key_topics="results/key_topics/{gene_set}_key_topics.csv"
+    output:
+        "results/filtered_topics/samp_25/{gene_set}_filtered_topics.csv"
+    shell:
+        """
+        python scripts/filter_by_sim.py \
+            {input.key_topics} \
+            {output} \
+            25
+        """
+
+rule filter_by_sim_75:
+    """
+    Filter the key topics by similarity (threshold 75).
+    """
+    input:
+        key_topics="results/key_topics/{gene_set}_key_topics.csv"
+    output:
+        "results/filtered_topics/samp_75/{gene_set}_filtered_topics.csv"
+    shell:
+        """
+        python scripts/filter_by_sim.py \
+            {input.key_topics} \
+            {output} \
+            75
+        """
+
+rule filter_by_sim_100:
+    """
+    Filter the key topics by similarity (threshold 100).
+    """
+    input:
+        key_topics="results/key_topics/{gene_set}_key_topics.csv"
+    output:
+        "results/filtered_topics/samp_100/{gene_set}_filtered_topics.csv"
+    shell:
+        """
+        python scripts/filter_by_sim.py \
+            {input.key_topics} \
+            {output} \
+            100
+        """

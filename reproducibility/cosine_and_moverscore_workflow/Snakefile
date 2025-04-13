@@ -1,0 +1,104 @@
+import glob
+
+gene_sets = glob.glob("data/filtered_sets/*.csv")
+gene_sets = [gs.split("/")[-1].replace("_filtered_gene_sets.csv", "") for gs in gene_sets]
+
+sample_numbers = [25, 50, 75, 100]
+
+print(gene_sets)
+
+rule all:
+    input:
+        expand("results/mover_score_results_{N}.csv", N=sample_numbers),
+        expand("results/cosine_score_results_{N}.csv", N=sample_numbers),
+
+rule moverscore:
+    input:
+        lambda wildcards: expand(
+            "data/filtered_topics/samp_{N}/{gene_set}_filtered_topics.csv",
+            gene_set=gene_sets,
+            N=[wildcards.N]
+        )
+    output:
+        results_csv="results/mover_score_results_{N}.csv",
+        plot_file="results/mover_score_scatter_{N}.png"
+    params:
+        scores_dir="results/scores_output_{N}",
+        sets_dir=directory("data/filtered_sets"),
+        topics_dir=directory("data/filtered_topics/samp_{N}")
+    wildcard_constraints:
+        N="(25|50|75|100)"
+    shell:
+        """
+        python scripts/calculate_mover_similarity.py \
+            --sets_dir {params.sets_dir} \
+            --topics_dir {params.topics_dir} \
+            --scores_dir {params.scores_dir} \
+            --results_csv {output.results_csv} \
+            --plot_file {output.plot_file} \
+            --num_gene_sets 999
+        """
+
+rule group_mover_score_results:
+    input:
+        csvs = expand("results/mover_score_results_{n}.csv", n=[25, 50, 75, 100])
+    output:
+        md="results/table_mover.md"
+    params:
+        folder="results",
+        pattern="mover_score_results_*.csv"
+    shell:
+        "python scripts/group_mover.py --folder {params.folder} --pattern '{params.pattern}' --output {output.md}"
+
+rule cosinescore:
+    input:
+        lambda wildcards: expand(
+            "data/filtered_topics/samp_{N}/{gene_set}_filtered_topics.csv",
+            gene_set=gene_sets,
+            N=[wildcards.N]
+        )
+    output:
+        results_csv="results/cosine_score_results_{N}.csv",
+        plot_file="results/cosine_score_scatter_{N}.png"
+    params:
+        scores_dir="results/cosine_scores_output_{N}",
+        sets_dir=directory("data/filtered_sets"),
+        topics_dir=directory("data/filtered_topics/samp_{N}")
+    wildcard_constraints:
+        N="(25|50|75|100)"
+    shell:
+        """
+        python scripts/calculate_cosine_similarity.py \
+            --sets_dir {params.sets_dir} \
+            --topics_dir {params.topics_dir} \
+            --scores_dir {params.scores_dir} \
+            --results_csv {output.results_csv} \
+            --plot_file {output.plot_file} \
+            --num_gene_sets 999
+        """
+
+rule generate_cosine_markdown:
+    input:
+        csvs = expand("results/cosine_score_results_{n}.csv", n=[25, 50, 75, 100])
+    output:
+        md = "results/cosine_table.md"
+    params:
+        folder = "results",
+        pattern = "cosine_score_results_*.csv"
+    shell:
+        "python scripts/generate_cosine_markdown_table.py --folder {params.folder} --pattern '{params.pattern}' --output {output.md}"
+
+rule generate_correlation_table:
+    input:
+        mover=expand("results/mover_score_results_{n}.csv", n=[25, 50, 75, 100]),
+        cosine=expand("results/cosine_score_results_{n}.csv", n=[25, 50, 75, 100])
+    output:
+        md="results/correlation_table.md"
+    params:
+        folder="results",
+        mover_pattern="mover_score_results_*.csv",
+        cosine_pattern="cosine_score_results_*.csv"
+    shell:
+        "python scripts/generate_pearson_markdown_table.py --folder {params.folder} "
+        "--mover_pattern '{params.mover_pattern}' --cosine_pattern '{params.cosine_pattern}' "
+        "--output {output.md}"

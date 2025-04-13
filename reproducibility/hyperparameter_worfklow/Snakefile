@@ -1,0 +1,266 @@
+import glob
+
+gene_sets = [f.split('/')[-1].replace('.txt', '') for f in glob.glob("data/test_set/*.txt")][:101]
+seeds = list(range(10))  # 10 different seeds (0-9)
+
+rule all:
+    input:
+        expand("results/enrichment_df/{gene_set}__documents.csv",
+               gene_set=gene_sets),
+        expand("results/summary/{gene_set}_seed_{seed}.csv",
+               gene_set=gene_sets, seed=seeds),
+        expand("results/filtered_sets/{gene_set}_filtered_gene_sets.csv", gene_set=gene_sets),
+        "results/topic_modelling_metrics.csv",
+        "results/ranking_metrics.png",
+        "results/combined_metrics.png",
+
+rule get_stringdb_genes_from_cache:
+    input:
+        "data/test_set/{gene_set}.txt"
+    output:
+        "results/enrichment_df/{gene_set}__documents.csv",
+        "results/enrichment_df/{gene_set}__enrichment.csv"
+    shell:
+        "python scripts/stringdb_retrieval_from_cache.py {input} data/string_db_cache results/enrichment_df/"
+
+rule get_topic_model:
+    """
+    Generates multiple topic-model outputs with different seeds for each gene set's documents.
+    Enforces only one instance running at a time via 'modelslot=1'.
+    """
+    input:
+        "results/enrichment_df/{gene_set}__documents.csv"
+    output:
+        "results/topics_for_genelists/{gene_set}_topic_model_seed_{seed}.csv"
+    shell:
+        """
+        python scripts/topic_modelling_mutli_seed_gpu.py \
+            --input_file {input} \
+            --output_file {output} \
+            --seed_value {wildcards.seed} \
+            --n_samples 1
+        """
+
+rule generate_prompts_for_minor_topics:
+    """
+    Generates prompts CSV from topic model outputs (no API calls).
+    """
+    input:
+        "results/topics_for_genelists/{gene_set}_topic_model_seed_{seed}.csv"
+    output:
+        # Intermediate CSV containing all prompts needed for the API calls
+        "results/prompts_for_minor_topics/{gene_set}_prompts_seed_{seed}.csv"
+    shell:
+        """
+        python scripts/generate_prompts_new.py \
+            --input {input} \
+            --num_subtopics 5 \
+            --max_words 10 \
+            --output_prompts {output} \
+            --max_retries 5
+        """
+
+rule call_api_for_minor_topics:
+    """
+    Consumes the prompts CSV, calls the API, and outputs the final minor topics CSV.
+    Also enforces single-run concurrency via 'modelslot=1'.
+    """
+    input:
+        "results/prompts_for_minor_topics/{gene_set}_prompts_seed_{seed}.csv"
+    output:
+        "results/minor_topics/{gene_set}_minor_topics_seed_{seed}.csv"
+    resources:
+        modelslot=1  # Ensures only one API-calling job runs at once
+    shell:
+        """
+        python scripts/call_api_combined_batch_multiseed.py \
+            --prompts_csv {input} \
+            --output_api {output} \
+            --n_job 50
+        """
+
+rule get_summary:
+    """
+    Generates a summary of the topic model output.
+    """
+    input:
+        minor_topic = "results/minor_topics/{gene_set}_minor_topics_seed_{seed}.csv",
+        enrichment = "results/enrichment_df/{gene_set}__enrichment.csv"
+    output:
+        "results/summary/{gene_set}_seed_{seed}.csv"
+    resources:
+        modelslot=1
+    shell:
+        """
+        python scripts/get_summary_multi_seed.py \
+            --enrichment_csv {input.enrichment} \
+            --minor_topics_csv {input.minor_topic} \
+            --output_csv {output}
+        """
+
+rule get_filtered_genesets:
+    """
+    Filters gene sets using hypergeometric enrichment analysis.
+    """
+    input:
+        df="results/summary/{gene_set}_seed_{seed}.csv",
+        gene_origin="data/test_set/{gene_set}.txt",
+        background_genes="data/background.txt"
+    output:
+        "results/filtered_sets/{gene_set}_filtered_gene_sets_seed_{seed}.csv"
+    shell:
+        """
+        python scripts/calculate_hypergeometric_enrichment_multiseed.py \
+            --df {input.df} \
+            --gene_origin {input.gene_origin} \
+            --background_genes {input.background_genes} \
+            --output_csv {output}
+        """
+
+rule combine_filtered_genesets:
+    """
+    Consolidate multiple gene set CSV files (for seeds 0..4) into one.
+    """
+    input:
+        # Only need the seed=0 file; the script finds the others automatically.
+        "results/filtered_sets/{gene_set}_filtered_gene_sets_seed_0.csv"
+    output:
+        "results/filtered_sets/{gene_set}_filtered_gene_sets.csv"
+    shell:
+        """
+        python scripts/consolidate_genesets.py \
+            --input_file {input} \
+            --n_samples 5 \
+            --output_file {output}
+        """
+
+rule topic_model_on_topic_model:
+    """
+    Runs topic modeling on the filtered gene sets with varying sample sizes.
+    """
+    input:
+        filtered_sets="results/filtered_sets/{gene_set}_filtered_gene_sets.csv"
+    output:
+        "results/resampled_topics/{gene_set}_final_topic_modeling_results_{n}_samples.csv"
+    shell:
+        """
+        python scripts/final_main_topics_for_model_on_model_gpu.py \
+            --input_file {input.filtered_sets} \
+            --output_file {output} \
+            --n_samples {wildcards.n} \
+        """
+
+#############################################################################
+#               STEP 5: Key Topics, Filtering, Clustering                   #
+#############################################################################
+
+rule get_key_topics:
+    """
+    Counts the top terms in the final topic modeling results for each sample size.
+    """
+    input:
+        resampled_topics="results/resampled_topics/{gene_set}_final_topic_modeling_results_{n}_samples.csv"
+    output:
+        "results/key_topics/{gene_set}_key_topics_{n}_samples.csv"
+    shell:
+        """
+        python scripts/count_top_topics.py \
+            {input.resampled_topics} \
+            {output}
+        """
+
+rule process_rank_data:
+    input:
+        expand("results/key_topics/{gene_set}_key_topics_{n}_samples.csv", gene_set=gene_sets, n = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25])
+    output:
+        "results/topic_modelling_metrics.csv"
+    script:
+        "scripts/kendall_rank_data_processing.py"
+
+rule visualize_rank_results:
+    input:
+        "results/topic_modelling_metrics.csv"
+    output:
+        "results/ranking_metrics.png",
+        "results/ranking_metrics.pdf"
+    script:
+        "scripts/kendall_rank_visualization.py"
+
+rule get_geneset_csv:
+    """
+    This rule processes a single gene set in parallel:
+      - The {gene_set} wildcard ensures each gene set is handled separately.
+      - We pass a file pattern so that the script only picks up CSVs for that gene set.
+      - The output is the two files for that gene set in results/cardinality/.
+    """
+    input:
+        # For example, if you have 5 seeds, 0..4
+        expand("results/filtered_sets/{{gene_set}}_filtered_gene_sets_seed_{n}.csv", n=[0,1,2,3,4,5,6,7,8,9])
+    output:
+        # The two files the Python script writes for each gene set
+        detailed="results/cardinality/{gene_set}_detailed.csv",
+        average="results/cardinality/{gene_set}_average.csv"
+    params:
+        outdir="results/cardinality"
+    shell:
+        """
+        python scripts/calculate_geneset_specific_csvs.py \
+            --input_dir results/filtered_sets \
+            --output_dir {params.outdir} \
+            --file_pattern "{wildcards.gene_set}_filtered_gene_sets_seed_*.csv" \
+            --log_level INFO
+        """
+
+##################################
+# 2) Combine rule
+##################################
+rule combine_averages:
+    """
+    This rule merges all {gene_set}_detailed.csv into all_gene_sets_detailed.csv
+    and all {gene_set}_average.csv into all_gene_sets_average.csv.
+    It only runs after all get_geneset_csv tasks are done.
+    """
+    input:
+        # We collect the outputs from all gene sets
+        detailed = expand("results/cardinality/{gene_set}_detailed.csv", gene_set=gene_sets),
+        average  = expand("results/cardinality/{gene_set}_average.csv", gene_set=gene_sets)
+    output:
+        combined_detailed = "results/cardinality/all_gene_sets_detailed.csv",
+        combined_average  = "results/cardinality/all_gene_sets_average.csv"
+    shell:
+        """
+        python scripts/calculate_averages.py \
+            --input_dir results/cardinality \
+            --output_dir results/cardinality \
+            --log_level INFO
+        """
+
+rule convert_df:
+    input:
+        "results/cardinality/all_gene_sets_average.csv",
+    output:
+        "results/soft_cardinality_results.csv"
+    shell:
+        """
+        python scripts/convert_df.py \
+            --input {input} \
+            --output {output}
+        """
+
+rule plot_cardinality:
+    input:
+        "results/cardinality/all_gene_sets_average.csv"
+    output:
+        "results/soft_cardinality.png"
+    script:
+        "scripts/soft_cardinality_visualization.py"
+
+rule visualize_combined_results:
+    input:
+        "results/topic_modelling_metrics.csv",
+        "results/soft_cardinality_results.csv"
+    output:
+        "results/combined_metrics.png",
+        "results/combined_metrics.pdf"
+    script:
+        "scripts/plot_combined_metrics_visualization.py"

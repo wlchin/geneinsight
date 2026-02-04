@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 import logging
-import pkg_resources
+import importlib.resources as resources
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import AgglomerativeClustering, KMeans, SpectralClustering
 from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score
@@ -25,7 +25,7 @@ def get_embedding_model():
     """
     try:
         # Get the path to the embedding_model directory in the package
-        model_path = pkg_resources.resource_filename('geneinsight', 'embedding_model')
+        model_path = str(resources.files('geneinsight').joinpath('embedding_model'))
         
         # Verify the model directory exists
         if not os.path.exists(model_path):

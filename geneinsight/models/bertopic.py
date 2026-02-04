@@ -9,7 +9,7 @@ import sys
 import logging
 import signal
 import pandas as pd
-import pkg_resources
+import importlib.resources as resources
 from typing import List, Tuple, Optional, Union
 from datetime import datetime
 
@@ -49,7 +49,7 @@ def get_embedding_model():
     SentenceTransformer: The loaded model
     """
     # Get the path to the embedding_model directory in the package
-    model_path = pkg_resources.resource_filename('geneinsight', 'embedding_model')
+    model_path = str(resources.files('geneinsight').joinpath('embedding_model'))
     
     # Verify the model directory exists
     if not os.path.exists(model_path):

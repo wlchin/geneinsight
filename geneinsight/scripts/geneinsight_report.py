@@ -343,8 +343,8 @@ def generate_report(results_dir, output_dir, title=None, cleanup=True):
         
         # Use package's default logo
         try:
-            from pkg_resources import resource_filename
-            logo_path = resource_filename('topicgenes.report', 'assets/logo.png')
+            import importlib.resources as pkg_resources
+            logo_path = str(pkg_resources.files('geneinsight.report').joinpath('assets/logo.png'))
             logger.debug(f"Using logo from package resources: {logo_path}")
         except Exception as e:
             logger.warning(f"Error loading logo from package resources: {e}")

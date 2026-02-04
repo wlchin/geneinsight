@@ -7,7 +7,7 @@ import logging
 import sys
 import pandas as pd
 import numpy as np
-import pkg_resources
+import importlib.resources as resources
 from typing import List, Tuple, Dict, Optional, Any, Union
 
 # Configure logging
@@ -42,7 +42,7 @@ def get_embedding_model():
         
     try:
         # Get the path to the embedding_model directory in the package
-        model_path = pkg_resources.resource_filename('geneinsight', 'embedding_model')
+        model_path = str(resources.files('geneinsight').joinpath('embedding_model'))
         
         # Verify the model directory exists
         if not os.path.exists(model_path):
@@ -80,7 +80,7 @@ def load_csv_data(file_path: str) -> List[str]:
             return df["Term"].tolist()
         else:
             # Try to find a suitable column for terms
-            text_columns = [col for col in df.columns if df[col].dtype == object]
+            text_columns = [col for col in df.columns if pd.api.types.is_string_dtype(df[col])]
             if text_columns:
                 logger.warning(f"'Term' column not found. Using '{text_columns[0]}' instead.")
                 return df[text_columns[0]].tolist()

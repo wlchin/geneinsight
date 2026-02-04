@@ -28,7 +28,7 @@ sphinx-wagtail-theme>=6.5.0
 sphinx-togglebutton>=0.3.2
 
 # Optional package
-ollama>=0.28.1
+ollama>=0.4.7
 
 # Development dependencies (commented out by default)
 # pytest>=7.3.1

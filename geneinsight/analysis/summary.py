@@ -1,7 +1,7 @@
 import argparse
 import pandas as pd
 import os
-import pkg_resources
+import importlib.resources as resources
 from tqdm import tqdm
 import logging
 import json
@@ -30,7 +30,7 @@ def get_embedding_model():
     """
     try:
         # Get the path to the embedding_model directory in the package
-        model_path = pkg_resources.resource_filename('geneinsight', 'embedding_model')
+        model_path = str(resources.files('geneinsight').joinpath('embedding_model'))
         
         # Verify the model directory exists
         if not os.path.exists(model_path):

@@ -6,7 +6,7 @@ import os
 import logging
 import pandas as pd
 import numpy as np
-import pkg_resources
+import importlib.resources as resources
 from typing import List, Dict, Optional, Union, Tuple
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ def get_embedding_model(model_name: str = None):
         from sentence_transformers import SentenceTransformer
         
         # Get the path to the embedding_model directory in the package
-        model_path = pkg_resources.resource_filename('geneinsight', 'embedding_model')
+        model_path = str(resources.files('geneinsight').joinpath('embedding_model'))
         
         # Verify the model directory exists
         if not os.path.exists(model_path):

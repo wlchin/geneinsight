@@ -500,23 +500,25 @@ class TestRunMultipleSeedTopicModeling:
     
     @pytest.mark.skipif(not DEPS_AVAILABLE, reason="Required dependencies not available")
     @patch("geneinsight.models.meta.initialize_bertopic")
-    @patch("geneinsight.models.meta.SentenceTransformer")
+    @patch("geneinsight.models.meta.get_embedding_model")
     @patch("geneinsight.models.meta.load_csv_data")
     def test_run_multiple_seed_topic_modeling_transformer_exception(
-        self, mock_load_csv, mock_transformer, mock_initialize_bertopic
+        self, mock_load_csv, mock_get_embedding_model, mock_initialize_bertopic
     ):
         """Test handling SentenceTransformer exception in multiple seed topic modeling."""
         # Setup mock to return terms
         mock_load_csv.return_value = MOCK_TERMS
-        
-        # Mock SentenceTransformer to raise exception
-        mock_transformer.side_effect = Exception("SentenceTransformer error")
-        
+
+        # Mock get_embedding_model to return a model that raises exception on encode
+        mock_model_inst = MagicMock()
+        mock_model_inst.encode.side_effect = Exception("Encoding error")
+        mock_get_embedding_model.return_value = mock_model_inst
+
         # Create mock BERTopic model that works without embeddings
         mock_model = MagicMock()
         mock_topics = [0, 1, 2, 0, 1]
         mock_probs = np.random.rand(5, 3).tolist()
-        
+
         # Mock document info
         mock_df = pd.DataFrame({
             "Document": MOCK_TERMS,
@@ -526,10 +528,10 @@ class TestRunMultipleSeedTopicModeling:
             "Representative_document": [True, False, True, False, True],
             "Top_n_words": ["word1, word2", "word3, word4", "word5, word6", "word1, word2", "word3, word4"]
         })
-        
+
         mock_model.get_document_info.return_value = mock_df
         mock_initialize_bertopic.return_value = (mock_model, mock_topics, mock_probs)
-        
+
         with patch("pandas.DataFrame.to_csv"), patch("os.makedirs"), patch("os.remove"):
             result_df = run_multiple_seed_topic_modeling(
                 input_file="input.csv",
@@ -538,12 +540,12 @@ class TestRunMultipleSeedTopicModeling:
                 num_topics=3,
                 n_samples=5
             )
-            
+
             # Assertions
             assert isinstance(result_df, pd.DataFrame)
             assert len(result_df) == 25  # 5 samples × 5 terms
-            
-            # Verify that models were initialized without embeddings
+
+            # Verify that models were initialized without embeddings (due to encoding error)
             for call_args in mock_initialize_bertopic.call_args_list:
                 kwargs = call_args[1]
                 assert "embeddings" not in kwargs or kwargs["embeddings"] is None
@@ -558,15 +560,15 @@ class TestRunMultipleSeedTopicModeling:
         """Test handling topic model exception in multiple seed topic modeling."""
         # Setup mock to return terms
         mock_load_csv.return_value = MOCK_TERMS
-        
+
         # Mock SentenceTransformer
         mock_transformer_inst = MagicMock()
         mock_transformer_inst.encode.return_value = np.random.rand(5, 384)  # Mock embeddings
         mock_transformer.return_value = mock_transformer_inst
-        
+
         # Mock model initialization to fail
         mock_initialize_bertopic.return_value = (None, [], [])
-        
+
         with patch("pandas.DataFrame.to_csv"), patch("os.makedirs"), patch("os.remove"):
             result_df = run_multiple_seed_topic_modeling(
                 input_file="input.csv",
@@ -575,7 +577,213 @@ class TestRunMultipleSeedTopicModeling:
                 num_topics=3,
                 n_samples=5
             )
-            
+
             # Assertions
             assert isinstance(result_df, pd.DataFrame)
             assert len(result_df) == 0  # No successful models
+
+
+# ============================================================================
+# Additional tests for improved coverage
+# ============================================================================
+
+from geneinsight.models.meta import get_embedding_model, main
+
+
+class TestGetEmbeddingModel:
+
+    @pytest.mark.skipif(not DEPS_AVAILABLE, reason="Required dependencies not available")
+    @patch("geneinsight.models.meta.resources.files")
+    @patch("geneinsight.models.meta.os.path.exists")
+    @patch("geneinsight.models.meta.SentenceTransformer")
+    def test_get_embedding_model_path_not_found(self, mock_transformer, mock_exists, mock_files):
+        """Test fallback when embedding model path doesn't exist."""
+        mock_files.return_value.joinpath.return_value = "/nonexistent/path"
+        mock_exists.return_value = False  # Path doesn't exist
+
+        mock_model = MagicMock()
+        mock_transformer.return_value = mock_model
+
+        result = get_embedding_model()
+
+        # Should fall back to online model
+        mock_transformer.assert_called_with("all-MiniLM-L6-v2")
+        assert result is mock_model
+
+    @pytest.mark.skipif(not DEPS_AVAILABLE, reason="Required dependencies not available")
+    @patch("geneinsight.models.meta.resources.files")
+    @patch("geneinsight.models.meta.os.path.exists")
+    @patch("geneinsight.models.meta.SentenceTransformer")
+    def test_get_embedding_model_exception_fallback(self, mock_transformer, mock_exists, mock_files):
+        """Test fallback when loading model raises exception."""
+        mock_files.return_value.joinpath.return_value = "/some/path"
+        mock_exists.return_value = True
+
+        # First call raises exception, second call (fallback) succeeds
+        mock_model = MagicMock()
+        mock_transformer.side_effect = [Exception("Model load error"), mock_model]
+
+        result = get_embedding_model()
+
+        # Should fall back to online model after exception
+        assert mock_transformer.call_count == 2
+        assert result is mock_model
+
+    def test_get_embedding_model_no_deps(self):
+        """Test get_embedding_model when dependencies are not available."""
+        with patch("geneinsight.models.meta.DEPS_AVAILABLE", False):
+            result = get_embedding_model()
+            assert result is None
+
+
+class TestMainCLI:
+
+    @patch("geneinsight.models.meta.run_multiple_seed_topic_modeling")
+    def test_main_cli(self, mock_run):
+        """Test the main CLI entry point."""
+        import argparse
+
+        mock_run.return_value = pd.DataFrame()
+
+        # Simulate command-line arguments
+        with patch("argparse.ArgumentParser.parse_args") as mock_parse_args:
+            mock_args = argparse.Namespace(
+                input_file="input.csv",
+                output_file="output/results.csv",
+                method="bertopic",
+                num_topics=5,
+                ncomp=2,
+                seed_value=42,
+                n_samples=10,
+                use_external_model=False
+            )
+            mock_parse_args.return_value = mock_args
+
+            main()
+
+        mock_run.assert_called_once_with(
+            input_file="input.csv",
+            output_file="output/results.csv",
+            method="bertopic",
+            num_topics=5,
+            ncomp=2,
+            seed_value=42,
+            n_samples=10,
+            use_local_model=True  # opposite of use_external_model
+        )
+
+    @patch("geneinsight.models.meta.run_multiple_seed_topic_modeling")
+    def test_main_cli_external_model(self, mock_run):
+        """Test main CLI with external model flag."""
+        import argparse
+
+        mock_run.return_value = pd.DataFrame()
+
+        with patch("argparse.ArgumentParser.parse_args") as mock_parse_args:
+            mock_args = argparse.Namespace(
+                input_file="input.csv",
+                output_file="output/results.csv",
+                method="kmeans",
+                num_topics=None,
+                ncomp=3,
+                seed_value=0,
+                n_samples=5,
+                use_external_model=True  # Use external model
+            )
+            mock_parse_args.return_value = mock_args
+
+            main()
+
+        mock_run.assert_called_once()
+        call_kwargs = mock_run.call_args[1]
+        assert call_kwargs["use_local_model"] is False
+
+
+class TestRunMultipleSeedExtended:
+
+    @pytest.mark.skipif(not DEPS_AVAILABLE, reason="Required dependencies not available")
+    @patch("geneinsight.models.meta.initialize_bertopic")
+    @patch("geneinsight.models.meta.get_embedding_model")
+    @patch("geneinsight.models.meta.load_csv_data")
+    @patch("pandas.DataFrame.to_csv")
+    @patch("os.makedirs")
+    @patch("os.remove")
+    def test_run_multiple_seed_external_model(
+        self, mock_remove, mock_makedirs, mock_to_csv, mock_load_csv,
+        mock_get_model, mock_initialize_bertopic
+    ):
+        """Test running with external model (use_local_model=False)."""
+        mock_load_csv.return_value = MOCK_TERMS
+
+        # Mock external SentenceTransformer
+        mock_model_inst = MagicMock()
+        mock_model_inst.encode.return_value = np.random.rand(5, 384)
+
+        # get_embedding_model shouldn't be called when use_local_model=False
+        mock_get_model.return_value = mock_model_inst
+
+        # Mock BERTopic model
+        mock_model = MagicMock()
+        mock_topics = [0, 1, 2, 0, 1]
+        mock_probs = np.random.rand(5, 3).tolist()
+        mock_df = pd.DataFrame({
+            "Document": MOCK_TERMS,
+            "Topic": mock_topics,
+            "Name": [f"Topic {t}" for t in mock_topics],
+            "Probability": [0.7, 0.6, 0.8, 0.7, 0.6],
+            "Representative_document": [True, False, True, False, True],
+            "Top_n_words": ["word1", "word2", "word3", "word4", "word5"]
+        })
+        mock_model.get_document_info.return_value = mock_df
+        mock_initialize_bertopic.return_value = (mock_model, mock_topics, mock_probs)
+
+        with patch("geneinsight.models.meta.SentenceTransformer") as mock_st:
+            mock_st.return_value = mock_model_inst
+
+            result_df = run_multiple_seed_topic_modeling(
+                input_file="input.csv",
+                output_file="output/results.csv",
+                method="bertopic",
+                num_topics=3,
+                n_samples=2,
+                use_local_model=False  # Use external model
+            )
+
+        assert isinstance(result_df, pd.DataFrame)
+
+    @pytest.mark.skipif(not DEPS_AVAILABLE, reason="Required dependencies not available")
+    @patch("geneinsight.models.meta.initialize_bertopic")
+    @patch("geneinsight.models.meta.get_embedding_model")
+    @patch("geneinsight.models.meta.load_csv_data")
+    @patch("pandas.DataFrame.to_csv")
+    @patch("os.makedirs")
+    def test_run_multiple_seed_get_document_info_exception(
+        self, mock_makedirs, mock_to_csv, mock_load_csv,
+        mock_get_model, mock_initialize_bertopic
+    ):
+        """Test handling exception in get_document_info."""
+        mock_load_csv.return_value = MOCK_TERMS
+
+        mock_model_inst = MagicMock()
+        mock_model_inst.encode.return_value = np.random.rand(5, 384)
+        mock_get_model.return_value = mock_model_inst
+
+        # Mock BERTopic model that raises exception on get_document_info
+        mock_model = MagicMock()
+        mock_model.get_document_info.side_effect = Exception("Document info error")
+        mock_topics = [0, 1, 2, 0, 1]
+        mock_probs = np.random.rand(5, 3).tolist()
+        mock_initialize_bertopic.return_value = (mock_model, mock_topics, mock_probs)
+
+        with patch("os.remove"):
+            result_df = run_multiple_seed_topic_modeling(
+                input_file="input.csv",
+                output_file="output/results.csv",
+                method="bertopic",
+                num_topics=3,
+                n_samples=2
+            )
+
+        # Should return empty DataFrame when all models fail
+        assert isinstance(result_df, pd.DataFrame)
+        assert len(result_df) == 0

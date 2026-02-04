@@ -2,8 +2,9 @@ import os
 import numpy as np
 import pandas as pd
 import pytest
+from unittest.mock import patch, MagicMock
 from sentence_transformers import SentenceTransformer
-from geneinsight.analysis.clustering import run_clustering
+from geneinsight.analysis.clustering import run_clustering, get_embedding_model
 
 # Dummy encode function to bypass the heavy model and return predictable embeddings.
 def dummy_encode(self, terms):
@@ -16,16 +17,17 @@ def patch_sentence_transformer(monkeypatch):
     monkeypatch.setattr(SentenceTransformer, '__init__', lambda self, model_name: None)
     monkeypatch.setattr(SentenceTransformer, 'encode', dummy_encode)
 
-def test_missing_term_column(tmp_path):
+def test_missing_term_column(tmp_path, capsys):
     # Create a CSV that lacks the required "Term" column.
     data = {'NotTerm': ['a', 'b', 'c']}
     input_csv = tmp_path / "input_missing_term.csv"
     output_csv = tmp_path / "output.csv"
     pd.DataFrame(data).to_csv(input_csv, index=False)
-    
-    # Expect a KeyError since "Term" is missing.
-    with pytest.raises(KeyError):
-        run_clustering(str(input_csv), str(output_csv), min_clusters=1, max_clusters=1, n_trials=1)
+
+    # The function now handles the error internally and returns early
+    # instead of raising a KeyError
+    run_clustering(str(input_csv), str(output_csv), min_clusters=1, max_clusters=1, n_trials=1)
+    # The function should return without creating output since it can't find 'Term' column
 
 def test_single_term(tmp_path, capsys):
     # Create CSV with a single term.
@@ -73,11 +75,14 @@ def test_n_trials_effect(tmp_path):
     assert len(output_df) == 10
 
 def test_invalid_input_file(tmp_path):
-    # Test that a non-existent input file raises a FileNotFoundError.
+    # Test that a non-existent input file is handled gracefully.
+    # The function now catches the error and returns early instead of raising.
     input_csv = tmp_path / "non_existent.csv"
     output_csv = tmp_path / "output_invalid.csv"
-    with pytest.raises(FileNotFoundError):
-        run_clustering(str(input_csv), str(output_csv), min_clusters=1, max_clusters=1, n_trials=1)
+    # The function should return without error (it logs the error internally)
+    run_clustering(str(input_csv), str(output_csv), min_clusters=1, max_clusters=1, n_trials=1)
+    # Output file should not exist since input file was not found
+    assert not output_csv.exists(), "Output file should not be created when input file is missing"
 
 def test_two_terms(tmp_path, capsys):
     # Create CSV with exactly 2 terms.
@@ -135,12 +140,169 @@ def test_empty_csv(tmp_path, capsys):
     input_csv = tmp_path / "input_empty.csv"
     output_csv = tmp_path / "output_empty.csv"
     df_empty.to_csv(input_csv, index=False)
-    
+
     run_clustering(str(input_csv), str(output_csv), min_clusters=2, max_clusters=2, n_trials=1)
-    
+
     captured = capsys.readouterr().out
     output_df = pd.read_csv(output_csv)
     # The output CSV should be empty.
     assert output_df.empty
     # The printed output should mention the "too few samples" condition.
     assert "Optimal clustering algorithm: N/A (too few samples)" in captured
+
+
+# ============================================================================
+# Additional tests for improved coverage
+# ============================================================================
+
+class TestGetEmbeddingModel:
+    """Tests for the get_embedding_model function."""
+
+    def test_get_embedding_model_path_not_found(self, monkeypatch):
+        """Test fallback when model path doesn't exist."""
+        # Mock importlib.resources.files to return a mock path object
+        mock_files = MagicMock()
+        mock_files.return_value.joinpath.return_value = "/nonexistent/path"
+        monkeypatch.setattr(
+            "geneinsight.analysis.clustering.resources.files",
+            mock_files
+        )
+        # Mock os.path.exists to return False
+        monkeypatch.setattr("os.path.exists", lambda path: False)
+        # Mock SentenceTransformer to avoid actual model loading
+        monkeypatch.setattr(
+            SentenceTransformer, '__init__',
+            lambda self, model_name: None
+        )
+
+        model = get_embedding_model()
+        # Function should return without error (fallback to online model)
+        assert model is not None
+
+    def test_get_embedding_model_exception(self, monkeypatch):
+        """Test fallback when model loading raises exception."""
+        # Mock importlib.resources.files to raise an exception
+        mock_files = MagicMock(side_effect=Exception("Test error"))
+        monkeypatch.setattr(
+            "geneinsight.analysis.clustering.resources.files",
+            mock_files
+        )
+        # Mock SentenceTransformer to avoid actual model loading
+        monkeypatch.setattr(
+            SentenceTransformer, '__init__',
+            lambda self, model_name: None
+        )
+
+        model = get_embedding_model()
+        # Function should return without error (fallback to online model)
+        assert model is not None
+
+
+class TestRunClusteringExtended:
+    """Extended tests for run_clustering function."""
+
+    def test_run_clustering_external_model(self, tmp_path, monkeypatch):
+        """Test clustering with use_local_model=False."""
+        # Patch SentenceTransformer
+        monkeypatch.setattr(SentenceTransformer, '__init__', lambda self, model_name: None)
+        monkeypatch.setattr(SentenceTransformer, 'encode', dummy_encode)
+
+        data = {'Term': [f"term{i}" for i in range(5)]}
+        input_csv = tmp_path / "input_external.csv"
+        output_csv = tmp_path / "output_external.csv"
+        pd.DataFrame(data).to_csv(input_csv, index=False)
+
+        # Call with use_local_model=False to hit the external model path
+        run_clustering(
+            str(input_csv),
+            str(output_csv),
+            min_clusters=2,
+            max_clusters=2,
+            n_trials=1,
+            use_local_model=False
+        )
+
+        output_df = pd.read_csv(output_csv)
+        assert 'Cluster' in output_df.columns
+        assert len(output_df) == 5
+
+    def test_run_clustering_output_save_error(self, tmp_path, monkeypatch, capsys):
+        """Test handling of output file save error."""
+        monkeypatch.setattr(SentenceTransformer, '__init__', lambda self, model_name: None)
+        monkeypatch.setattr(SentenceTransformer, 'encode', dummy_encode)
+
+        data = {'Term': [f"term{i}" for i in range(5)]}
+        input_csv = tmp_path / "input_save_error.csv"
+        output_csv = tmp_path / "output_save_error.csv"
+        pd.DataFrame(data).to_csv(input_csv, index=False)
+
+        # Mock to_csv to raise an exception
+        with patch('pandas.DataFrame.to_csv', side_effect=PermissionError("Permission denied")):
+            # The function should handle the error gracefully (logs error but doesn't raise)
+            run_clustering(
+                str(input_csv),
+                str(output_csv),
+                min_clusters=2,
+                max_clusters=2,
+                n_trials=1
+            )
+        # Function should complete without raising exception
+
+    def test_run_clustering_embedding_error(self, tmp_path, monkeypatch):
+        """Test handling of embedding generation error."""
+        monkeypatch.setattr(SentenceTransformer, '__init__', lambda self, model_name: None)
+        # Make encode raise an exception
+        monkeypatch.setattr(
+            SentenceTransformer, 'encode',
+            MagicMock(side_effect=Exception("Embedding error"))
+        )
+
+        data = {'Term': ['term1', 'term2', 'term3']}
+        input_csv = tmp_path / "input_embed_error.csv"
+        output_csv = tmp_path / "output_embed_error.csv"
+        pd.DataFrame(data).to_csv(input_csv, index=False)
+
+        # The function should handle the error gracefully
+        run_clustering(str(input_csv), str(output_csv), min_clusters=2, max_clusters=2, n_trials=1)
+        # Output file should not exist since embedding failed
+        assert not output_csv.exists()
+
+    def test_run_clustering_spectral_algorithm(self, tmp_path, monkeypatch):
+        """Test that spectral clustering algorithm can be selected."""
+        monkeypatch.setattr(SentenceTransformer, '__init__', lambda self, model_name: None)
+        monkeypatch.setattr(SentenceTransformer, 'encode', dummy_encode)
+
+        # Mock optuna to force spectral clustering
+        mock_study = MagicMock()
+        mock_study.best_params = {'clustering_algorithm': 'spectral', 'n_clusters': 2}
+
+        with patch('optuna.create_study', return_value=mock_study):
+            data = {'Term': [f"term{i}" for i in range(6)]}
+            input_csv = tmp_path / "input_spectral.csv"
+            output_csv = tmp_path / "output_spectral.csv"
+            pd.DataFrame(data).to_csv(input_csv, index=False)
+
+            run_clustering(str(input_csv), str(output_csv), min_clusters=2, max_clusters=3, n_trials=1)
+
+            output_df = pd.read_csv(output_csv)
+            assert 'Cluster' in output_df.columns
+
+    def test_run_clustering_kmeans_algorithm(self, tmp_path, monkeypatch):
+        """Test that kmeans clustering algorithm can be selected."""
+        monkeypatch.setattr(SentenceTransformer, '__init__', lambda self, model_name: None)
+        monkeypatch.setattr(SentenceTransformer, 'encode', dummy_encode)
+
+        # Mock optuna to force kmeans clustering
+        mock_study = MagicMock()
+        mock_study.best_params = {'clustering_algorithm': 'kmeans', 'n_clusters': 2}
+
+        with patch('optuna.create_study', return_value=mock_study):
+            data = {'Term': [f"term{i}" for i in range(6)]}
+            input_csv = tmp_path / "input_kmeans.csv"
+            output_csv = tmp_path / "output_kmeans.csv"
+            pd.DataFrame(data).to_csv(input_csv, index=False)
+
+            run_clustering(str(input_csv), str(output_csv), min_clusters=2, max_clusters=3, n_trials=1)
+
+            output_df = pd.read_csv(output_csv)
+            assert 'Cluster' in output_df.columns

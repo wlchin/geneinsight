@@ -264,7 +264,7 @@ class TestUtilityFunctions:
         """Test initialize_rag_module function."""
         with patch('geneinsight.analysis.summary.RAGModule') as mock_rag:
             initialize_rag_module(sample_df)
-            mock_rag.assert_called_once_with(sample_df)
+            mock_rag.assert_called_once_with(sample_df, use_local_model=True)
 
     def test_get_topics_of_interest(self, topics_df):
         """Test get_topics_of_interest function."""
@@ -334,6 +334,7 @@ class TestUtilityFunctions:
         args.minor_topics_csv = str(topics_path)
         args.output_csv = str(output_path)
         args.num_results = 3
+        args.use_external_model = False  # Default to use local model
         
         # Mock the functions
         with patch('geneinsight.analysis.summary.read_input_files', return_value=(sample_df, topics_df)) as mock_read:
@@ -345,11 +346,204 @@ class TestUtilityFunctions:
                         with patch('geneinsight.analysis.summary.save_results') as mock_save:
                             
                             main(args)
-                            
+
                             # Check that all functions were called with correct arguments
                             mock_read.assert_called_once_with(str(enrichment_path), str(topics_path))
-                            mock_init.assert_called_once_with(sample_df)
+                            mock_init.assert_called_once_with(sample_df, use_local_model=True)
                             mock_get_topics.assert_called_once_with(topics_df)
                             mock_generate.assert_called_once_with("mock_rag_module", ["Topic 1", "Topic 2"], num_results=3)
                             mock_save.assert_called_once()
                             assert mock_save.call_args[0][1] == str(output_path)
+
+
+# ============================================================================
+# Additional tests for improved coverage
+# ============================================================================
+
+class TestGetEmbeddingModel:
+    """Tests for the get_embedding_model function."""
+
+    def test_get_embedding_model_path_not_found(self, monkeypatch):
+        """Test fallback when model path doesn't exist."""
+        from geneinsight.analysis.summary import get_embedding_model
+        from sentence_transformers import SentenceTransformer
+
+        mock_files = MagicMock()
+        mock_files.return_value.joinpath.return_value = "/nonexistent/path"
+        monkeypatch.setattr(
+            "geneinsight.analysis.summary.resources.files",
+            mock_files
+        )
+        monkeypatch.setattr("os.path.exists", lambda path: False)
+        monkeypatch.setattr(
+            SentenceTransformer, '__init__',
+            lambda self, model_name: None
+        )
+
+        model = get_embedding_model()
+        assert model is not None
+
+    def test_get_embedding_model_exception(self, monkeypatch):
+        """Test fallback when model loading raises exception."""
+        from geneinsight.analysis.summary import get_embedding_model
+        from sentence_transformers import SentenceTransformer
+
+        mock_files = MagicMock(side_effect=Exception("Test error"))
+        monkeypatch.setattr(
+            "geneinsight.analysis.summary.resources.files",
+            mock_files
+        )
+        monkeypatch.setattr(
+            SentenceTransformer, '__init__',
+            lambda self, model_name: None
+        )
+
+        model = get_embedding_model()
+        assert model is not None
+
+
+class TestRAGModuleExtended:
+    """Extended tests for RAGModule."""
+
+    def test_rag_module_external_model(self, sample_df):
+        """Test RAGModule with use_local_model=False."""
+        with patch('geneinsight.analysis.summary.SentenceTransformer') as mock_transformer:
+            mock_transformer.return_value.encode.return_value = torch.rand((5, 10))
+
+            # Test with use_local_model=False
+            module = RAGModule(sample_df, use_local_model=False)
+            assert len(module.documents) == 5
+            # Should have been called with the online model name
+            mock_transformer.assert_called_with("sentence-transformers/all-MiniLM-L6-v2")
+
+    def test_format_references_no_gene_column(self, sample_df):
+        """Test format_references_and_genes when neither inputGenes nor preferred_names exists."""
+        # Create a DataFrame without gene columns
+        df_no_genes = pd.DataFrame({
+            "term": ["GO:0001", "GO:0002", "GO:0003"],
+            "description": ["Process 1", "Process 2", "Process 3"]
+        })
+
+        with patch('geneinsight.analysis.summary.SentenceTransformer') as mock_transformer:
+            mock_transformer.return_value.encode.return_value = torch.rand((3, 10))
+
+            module = RAGModule(df_no_genes)
+            module.document_embeddings = torch.rand((3, 10))
+
+            indices = torch.tensor([0, 1])
+            references, unique_genes = module.format_references_and_genes(indices)
+
+            # Should return empty lists when no gene column exists
+            assert references == []
+            assert unique_genes == {}
+
+    def test_format_references_with_preferred_names(self, sample_df):
+        """Test format_references_and_genes with preferred_names column."""
+        df_preferred = pd.DataFrame({
+            "term": ["GO:0001", "GO:0002"],
+            "description": ["Process 1", "Process 2"],
+            "preferred_names": ["GENE1,GENE2", "GENE2,GENE3"]
+        })
+
+        with patch('geneinsight.analysis.summary.SentenceTransformer') as mock_transformer:
+            mock_transformer.return_value.encode.return_value = torch.rand((2, 10))
+
+            module = RAGModule(df_preferred)
+            module.document_embeddings = torch.rand((2, 10))
+
+            indices = torch.tensor([0, 1])
+            references, unique_genes = module.format_references_and_genes(indices)
+
+            assert len(references) == 2
+            assert "GENE1" in unique_genes
+            assert "GENE2" in unique_genes
+
+
+class TestCreateSummary:
+    """Tests for the create_summary function."""
+
+    def test_create_summary_basic(self, sample_df):
+        """Test create_summary function with valid inputs."""
+        api_results_df = pd.DataFrame({
+            "query": ["Topic 1", "Topic 2"]
+        })
+
+        with patch('geneinsight.analysis.summary.RAGModule') as mock_rag:
+            mock_instance = MagicMock()
+            mock_instance.get_summary_to_query_df.return_value = pd.DataFrame({
+                "query": ["Topic 1"],
+                "response": ["Response 1"]
+            })
+            mock_rag.return_value = mock_instance
+
+            result = create_summary(api_results_df, sample_df)
+
+            assert mock_rag.called
+            assert isinstance(result, pd.DataFrame)
+
+    def test_create_summary_with_generated_result_column(self, sample_df):
+        """Test create_summary when 'query' column is missing but 'generated_result' exists."""
+        api_results_df = pd.DataFrame({
+            "generated_result": ["Topic 1", "Topic 2"]
+        })
+
+        with patch('geneinsight.analysis.summary.RAGModule') as mock_rag:
+            mock_instance = MagicMock()
+            mock_instance.get_summary_to_query_df.return_value = pd.DataFrame({
+                "query": ["Topic 1"],
+                "response": ["Response 1"]
+            })
+            mock_rag.return_value = mock_instance
+
+            result = create_summary(api_results_df, sample_df)
+
+            assert mock_rag.called
+            assert isinstance(result, pd.DataFrame)
+
+    def test_create_summary_missing_columns_error(self, sample_df):
+        """Test create_summary raises ValueError when required columns missing."""
+        api_results_df = pd.DataFrame({
+            "other_column": ["Value 1", "Value 2"]
+        })
+
+        with pytest.raises(ValueError, match="must contain a 'query' column"):
+            create_summary(api_results_df, sample_df)
+
+    def test_create_summary_with_output_file(self, sample_df, tmp_path):
+        """Test create_summary with summary_output parameter."""
+        api_results_df = pd.DataFrame({
+            "query": ["Topic 1"]
+        })
+
+        output_path = tmp_path / "summary_output.csv"
+
+        with patch('geneinsight.analysis.summary.RAGModule') as mock_rag:
+            mock_instance = MagicMock()
+            mock_instance.get_summary_to_query_df.return_value = pd.DataFrame({
+                "query": ["Topic 1"],
+                "response": ["Response 1"]
+            })
+            mock_rag.return_value = mock_instance
+
+            result = create_summary(api_results_df, sample_df, summary_output=str(output_path))
+
+            assert output_path.exists()
+
+    def test_create_summary_external_model(self, sample_df):
+        """Test create_summary with use_local_model=False."""
+        api_results_df = pd.DataFrame({
+            "query": ["Topic 1"]
+        })
+
+        with patch('geneinsight.analysis.summary.RAGModule') as mock_rag:
+            mock_instance = MagicMock()
+            mock_instance.get_summary_to_query_df.return_value = pd.DataFrame({
+                "query": ["Topic 1"],
+                "response": ["Response 1"]
+            })
+            mock_rag.return_value = mock_instance
+
+            result = create_summary(api_results_df, sample_df, use_local_model=False)
+
+            # Check that RAGModule was called with use_local_model=False
+            mock_rag.assert_called_once_with(sample_df, use_local_model=False)

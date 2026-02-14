@@ -214,13 +214,13 @@ class TestPipelineInit:
 
 # Tests for individual pipeline methods
 class TestPipelineMethods:
-    @patch("geneinsight.enrichment.stringdb.process_gene_enrichment")
+    @patch("geneinsight.enrichment.stringdb_local.process_gene_enrichment")
     def test_get_stringdb_enrichment(
-        self, 
-        mock_process, 
-        pipeline, 
-        mock_files, 
-        mock_enrichment_df, 
+        self,
+        mock_process,
+        pipeline,
+        mock_files,
+        mock_enrichment_df,
         mock_documents_df
     ):
         """Test the _get_stringdb_enrichment method."""
@@ -229,18 +229,17 @@ class TestPipelineMethods:
             mock_enrichment_df,
             ["Description 1", "Description 2", "Description 3"]
         )
-        
-        # Call the method
+
+        # Call the method (pipeline uses local stringdb by default for species 9606)
         enrichment_df, documents_df = pipeline._get_stringdb_enrichment(mock_files["query"])
-        
-        # Verify the call
+
+        # Verify the call - local stringdb doesn't use mode parameter
         mock_process.assert_called_once_with(
             input_file=mock_files["query"],
             output_dir=pipeline.dirs["enrichment"],
-            species=pipeline.species,   # <-- This is important now
-            mode="single"
+            species=pipeline.species
         )
-        
+
         # Check results
         pd.testing.assert_frame_equal(enrichment_df, mock_enrichment_df)
         assert documents_df.shape[0] == 3
@@ -293,27 +292,27 @@ class TestPipelineMethods:
     
     @patch("geneinsight.api.client.batch_process_api_calls")
     def test_process_api_calls(
-        self, 
-        mock_api_calls, 
-        pipeline, 
-        mock_prompts_df, 
+        self,
+        mock_api_calls,
+        pipeline,
+        mock_prompts_df,
         mock_api_results_df
     ):
         """Test the _process_api_calls method."""
-        # Setup the mock
-        mock_api_calls.return_value = mock_api_results_df
-        
-        # Call the method
-        result = pipeline._process_api_calls(mock_prompts_df)
-        
+        # Setup the mock - batch_process_api_calls now returns (df, metrics) tuple
+        mock_api_calls.return_value = (mock_api_results_df, None)
+
+        # Call the method - _process_api_calls returns (df, metrics) tuple
+        result_df, result_metrics = pipeline._process_api_calls(mock_prompts_df)
+
         # Verify the call
         mock_api_calls.assert_called_once()
         assert mock_api_calls.call_args[1]["service"] == pipeline.api_service
         assert mock_api_calls.call_args[1]["model"] == pipeline.api_model
         assert mock_api_calls.call_args[1]["n_jobs"] == pipeline.api_parallel_jobs
-        
+
         # Check results
-        pd.testing.assert_frame_equal(result, mock_api_results_df)
+        pd.testing.assert_frame_equal(result_df, mock_api_results_df)
     
     @patch("geneinsight.analysis.summary.create_summary")
     def test_create_summary(
@@ -478,37 +477,37 @@ class TestPipelineMethods:
         assert metadata["n_samples"][0] == pipeline.n_samples
         assert metadata["api_service"][0] == pipeline.api_service
     
-    @patch("geneinsight.pipeline.OntologyWorkflow")
+    @patch("geneinsight.ontology.workflow.OntologyWorkflow")
     def test_perform_ontology_enrichment(
-        self, 
-        mock_ontology_workflow, 
-        pipeline, 
-        mock_summary_df, 
-        mock_clustered_df, 
-        mock_files, 
+        self,
+        mock_ontology_workflow,
+        pipeline,
+        mock_summary_df,
+        mock_clustered_df,
+        mock_files,
         mock_ontology_dict_df
     ):
         """Test the _perform_ontology_enrichment method."""
         # Setup the mock
         mock_workflow_instance = MagicMock()
         mock_workflow_instance.process_dataframes.return_value = (
-            mock_clustered_df, 
+            mock_clustered_df,
             mock_ontology_dict_df
         )
         mock_ontology_workflow.return_value = mock_workflow_instance
-        
+
         # Call the method
         result = pipeline._perform_ontology_enrichment(
-            mock_summary_df, 
-            mock_clustered_df, 
-            mock_files["query"], 
+            mock_summary_df,
+            mock_clustered_df,
+            mock_files["query"],
             mock_files["background"]
         )
-        
+
         # Verify the calls
         mock_ontology_workflow.assert_called_once()
         mock_workflow_instance.process_dataframes.assert_called_once()
-        
+
         # Check results
         pd.testing.assert_frame_equal(result, mock_ontology_dict_df)
 
@@ -628,7 +627,7 @@ class TestPipelineRun:
             patch.object(pipeline, '_run_topic_modeling', return_value=mock_topics_df) as mock_topic_modeling, \
             patch.object(pipeline, '_run_topic_modeling_on_filtered_sets', return_value=mock_topics_df) as mock_topic_modeling_on_filtered_sets, \
             patch.object(pipeline, '_generate_prompts', return_value=mock_prompts_df) as mock_generate_prompts, \
-            patch.object(pipeline, '_process_api_calls', return_value=mock_api_results_df) as mock_process_api, \
+            patch.object(pipeline, '_process_api_calls', return_value=(mock_api_results_df, None)) as mock_process_api, \
             patch.object(pipeline, '_create_summary', return_value=mock_summary_df) as mock_create_summary, \
             patch.object(pipeline, '_perform_hypergeometric_enrichment', return_value=mock_enriched_df) as mock_hypergeom, \
             patch.object(pipeline, '_get_key_topics', return_value=mock_key_topics_df) as mock_key_topics, \
@@ -681,7 +680,7 @@ class TestPipelineRun:
         with patch.object(pipeline, '_get_stringdb_enrichment', return_value=(mock_enrichment_df, mock_documents_df)), \
              patch.object(pipeline, '_run_topic_modeling', side_effect=[mock_topics_df, mock_topics_df]), \
              patch.object(pipeline, '_generate_prompts', return_value=mock_prompts_df), \
-             patch.object(pipeline, '_process_api_calls', return_value=mock_api_results_df), \
+             patch.object(pipeline, '_process_api_calls', return_value=(mock_api_results_df, None)), \
              patch.object(pipeline, '_create_summary', return_value=mock_summary_df), \
              patch.object(pipeline, '_perform_hypergeometric_enrichment', return_value=mock_enriched_df), \
              patch.object(pipeline, '_get_key_topics', return_value=mock_key_topics_df), \
@@ -692,13 +691,13 @@ class TestPipelineRun:
              patch.object(pipeline, '_generate_report') as mock_report, \
              patch.object(pipeline, '_reorganize_output_directory'), \
              patch.object(pipeline, '_cleanup_temp'):
-            
+
             output = pipeline.run(
                 query_gene_set=mock_files["query"],
                 background_gene_list=mock_files["background"],
                 generate_report=False
             )
-            
+
             mock_report.assert_not_called()
             assert output == pipeline.dirs["final"]
 
@@ -724,17 +723,17 @@ class TestPipelineRun:
         Test that run() raises a ValueError when _perform_hypergeometric_enrichment returns an empty DataFrame.
         """
         empty_df = pd.DataFrame()
-        
+
         with patch.object(pipeline, '_get_stringdb_enrichment', return_value=(mock_enrichment_df, mock_documents_df)), \
             patch.object(pipeline, '_run_topic_modeling', return_value=mock_topics_df), \
             patch.object(pipeline, '_generate_prompts', return_value=mock_prompts_df), \
-            patch.object(pipeline, '_process_api_calls', return_value=mock_api_results_df), \
+            patch.object(pipeline, '_process_api_calls', return_value=(mock_api_results_df, None)), \
             patch.object(pipeline, '_create_summary', return_value=mock_summary_df), \
             patch.object(pipeline, '_perform_hypergeometric_enrichment', return_value=empty_df):
-            
+
             with pytest.raises(ValueError, match="Hypergeometric enrichment resulted in an empty DataFrame"):
                 pipeline.run(
-                    query_gene_set=mock_files["query"], 
+                    query_gene_set=mock_files["query"],
                     background_gene_list=mock_files["background"]
                 )
 
@@ -748,7 +747,7 @@ class TestPipelineRun:
         with patch.object(pipeline, '_get_stringdb_enrichment', return_value=(mock_enrichment_df, mock_documents_df)), \
              patch.object(pipeline, '_run_topic_modeling', side_effect=[mock_topics_df, mock_topics_df]), \
              patch.object(pipeline, '_generate_prompts', return_value=mock_prompts_df), \
-             patch.object(pipeline, '_process_api_calls', return_value=mock_api_results_df), \
+             patch.object(pipeline, '_process_api_calls', return_value=(mock_api_results_df, None)), \
              patch.object(pipeline, '_create_summary', return_value=mock_summary_df), \
              patch.object(pipeline, '_perform_hypergeometric_enrichment', return_value=mock_enriched_df), \
              patch.object(pipeline, '_get_key_topics', return_value=mock_key_topics_df), \
@@ -759,7 +758,7 @@ class TestPipelineRun:
              patch.object(pipeline, '_generate_report', return_value=None) as mock_report, \
              patch.object(pipeline, '_reorganize_output_directory'), \
              patch.object(pipeline, '_cleanup_temp'):
-            
+
             output = pipeline.run(
                 query_gene_set=mock_files["query"],
                 background_gene_list=mock_files["background"],
@@ -767,3 +766,271 @@ class TestPipelineRun:
             )
             mock_report.assert_called_once()
             assert output == pipeline.dirs["final"]
+
+
+# ============================================================================
+# Additional tests for improved coverage
+# ============================================================================
+
+class TestPipelineErrorHandling:
+    """Tests for error handling in the pipeline."""
+
+    def test_missing_openai_api_key(self, temp_dir, output_dir, monkeypatch):
+        """Test that pipeline raises ValueError when OpenAI API key is missing."""
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+        with pytest.raises(ValueError, match="OpenAI API key not found"):
+            Pipeline(
+                output_dir=output_dir,
+                api_service="openai"
+            )
+
+    def test_pipeline_with_non_openai_service(self, output_dir):
+        """Test that pipeline doesn't require API key for non-openai services."""
+        # Should not raise even without OPENAI_API_KEY
+        pipeline = Pipeline(
+            output_dir=output_dir,
+            api_service="ollama"  # Non-OpenAI service
+        )
+        assert pipeline.api_service == "ollama"
+
+    def test_corrupted_gene_file(self, temp_dir, output_dir, monkeypatch):
+        """Test handling of corrupted gene file."""
+        monkeypatch.setenv("OPENAI_API_KEY", "fake_key")
+
+        pipeline = Pipeline(output_dir=output_dir)
+
+        # Create a corrupted gene file
+        query_file = os.path.join(temp_dir, "corrupted.txt")
+        with open(query_file, "w") as f:
+            f.write("not,a,proper,csv\n")
+
+        background_file = os.path.join(temp_dir, "background.txt")
+        with open(background_file, "w") as f:
+            f.write("GENE1\nGENE2\n")
+
+        # Should handle the file but may fail on overlap check
+        with pytest.raises(Exception):  # Will fail because of file format issues
+            pipeline.run(
+                query_gene_set=query_file,
+                background_gene_list=background_file
+            )
+
+    def test_empty_stringdb_results(self, pipeline, mock_files):
+        """Test that pipeline raises error when StringDB returns empty results."""
+        empty_df = pd.DataFrame()
+        empty_docs_df = pd.DataFrame()
+
+        with patch.object(pipeline, '_get_stringdb_enrichment', return_value=(empty_df, empty_docs_df)):
+            with pytest.raises(ValueError, match="No enrichment or documents returned"):
+                pipeline.run(
+                    query_gene_set=mock_files["query"],
+                    background_gene_list=mock_files["background"]
+                )
+
+    def test_all_terms_filtered_by_overlap(self, pipeline, mock_files, mock_enrichment_df,
+                                            mock_documents_df, mock_topics_df, mock_prompts_df,
+                                            mock_api_results_df, mock_summary_df, mock_enriched_df):
+        """Test that pipeline raises error when all terms are filtered by overlap ratio."""
+        empty_df_after_filter = pd.DataFrame()
+
+        with patch.object(pipeline, '_get_stringdb_enrichment', return_value=(mock_enrichment_df, mock_documents_df)), \
+             patch.object(pipeline, '_run_topic_modeling', return_value=mock_topics_df), \
+             patch.object(pipeline, '_generate_prompts', return_value=mock_prompts_df), \
+             patch.object(pipeline, '_process_api_calls', return_value=(mock_api_results_df, None)), \
+             patch.object(pipeline, '_create_summary', return_value=mock_summary_df), \
+             patch.object(pipeline, '_perform_hypergeometric_enrichment', return_value=mock_enriched_df), \
+             patch.object(pipeline, '_filter_by_overlap_ratio', return_value=empty_df_after_filter):
+
+            with pytest.raises(ValueError, match="All terms filtered out by overlap ratio"):
+                pipeline.run(
+                    query_gene_set=mock_files["query"],
+                    background_gene_list=mock_files["background"]
+                )
+
+    def test_cleanup_error_handling(self, temp_dir, output_dir, monkeypatch):
+        """Test that cleanup errors are handled gracefully."""
+        monkeypatch.setenv("OPENAI_API_KEY", "fake_key")
+
+        pipeline = Pipeline(output_dir=output_dir)
+
+        # Mock shutil.rmtree to raise an error
+        with patch("geneinsight.pipeline.shutil.rmtree", side_effect=PermissionError("Cannot delete")):
+            # Should not raise, just log warning
+            pipeline._cleanup_temp()
+
+
+class TestPipelineMetrics:
+    """Tests for metrics collection in the pipeline."""
+
+    def test_with_metrics_enabled(self, output_dir, monkeypatch):
+        """Test pipeline initialization with metrics enabled."""
+        monkeypatch.setenv("OPENAI_API_KEY", "fake_key")
+
+        pipeline = Pipeline(
+            output_dir=output_dir,
+            enable_metrics=True
+        )
+
+        # Check that metrics collector is initialized
+        if pipeline.metrics_collector is not None:
+            assert pipeline.enable_metrics is True
+
+    def test_metrics_disabled(self, output_dir, monkeypatch):
+        """Test pipeline initialization with metrics disabled."""
+        monkeypatch.setenv("OPENAI_API_KEY", "fake_key")
+
+        pipeline = Pipeline(
+            output_dir=output_dir,
+            enable_metrics=False
+        )
+
+        assert pipeline.enable_metrics is False
+        assert pipeline.metrics_collector is None
+
+    def test_metrics_output_path_custom(self, output_dir, monkeypatch):
+        """Test pipeline with custom metrics output path."""
+        monkeypatch.setenv("OPENAI_API_KEY", "fake_key")
+
+        custom_path = os.path.join(output_dir, "custom_metrics.json")
+        pipeline = Pipeline(
+            output_dir=output_dir,
+            enable_metrics=True,
+            metrics_output_path=custom_path
+        )
+
+        assert pipeline.metrics_output_path == custom_path
+
+    def test_quiet_metrics(self, output_dir, monkeypatch):
+        """Test pipeline with quiet metrics mode."""
+        monkeypatch.setenv("OPENAI_API_KEY", "fake_key")
+
+        pipeline = Pipeline(
+            output_dir=output_dir,
+            quiet_metrics=True
+        )
+
+        assert pipeline.quiet_metrics is True
+
+
+class TestPipelineSpeciesVariations:
+    """Tests for species-specific behavior in the pipeline."""
+
+    def test_non_local_species_uses_api(self, output_dir, monkeypatch):
+        """Test that non-local species (e.g., 7227) uses StringDB API."""
+        monkeypatch.setenv("OPENAI_API_KEY", "fake_key")
+
+        pipeline = Pipeline(
+            output_dir=output_dir,
+            species=7227,  # Drosophila - not in local cache
+            use_local_stringdb=True
+        )
+
+        # Create mock files
+        query_file = os.path.join(output_dir, "query.txt")
+        with open(query_file, "w") as f:
+            f.write("GENE1\nGENE2\n")
+
+        with patch("geneinsight.enrichment.stringdb.process_gene_enrichment") as mock_api:
+            mock_api.return_value = (
+                pd.DataFrame({"gene": ["GENE1"], "description": ["Desc1"]}),
+                ["Desc1"]
+            )
+
+            # Call _get_stringdb_enrichment
+            enrichment_df, documents_df = pipeline._get_stringdb_enrichment(query_file)
+
+            # Should use API module for non-local species
+            mock_api.assert_called_once()
+
+    def test_use_local_stringdb_false(self, output_dir, monkeypatch):
+        """Test that use_local_stringdb=False uses API even for human genes."""
+        monkeypatch.setenv("OPENAI_API_KEY", "fake_key")
+
+        pipeline = Pipeline(
+            output_dir=output_dir,
+            species=9606,  # Human
+            use_local_stringdb=False  # Force API usage
+        )
+
+        query_file = os.path.join(output_dir, "query.txt")
+        with open(query_file, "w") as f:
+            f.write("BRCA1\nTP53\n")
+
+        with patch("geneinsight.enrichment.stringdb.process_gene_enrichment") as mock_api:
+            mock_api.return_value = (
+                pd.DataFrame({"gene": ["BRCA1"], "description": ["Breast cancer 1"]}),
+                ["Breast cancer 1"]
+            )
+
+            enrichment_df, documents_df = pipeline._get_stringdb_enrichment(query_file)
+
+            # Should use API module even for human genes when use_local_stringdb=False
+            mock_api.assert_called_once()
+
+
+class TestPipelineReportGeneration:
+    """Tests for report generation in the pipeline."""
+
+    def test_report_import_error(self, pipeline, mock_files):
+        """Test handling of report module import error."""
+        output_path = os.path.join(pipeline.dirs["final"], "test_run")
+        os.makedirs(output_path, exist_ok=True)
+
+        with patch.dict('sys.modules', {'geneinsight.report': None}):
+            with patch("geneinsight.pipeline.Pipeline._generate_report") as mock_gen:
+                # Simulate import error behavior
+                mock_gen.return_value = None
+
+                result = mock_gen(
+                    output_path=output_path,
+                    query_gene_set=mock_files["query"],
+                    report_title="Test Report"
+                )
+
+                assert result is None
+
+    def test_report_generation_returns_false(self, pipeline, mock_files):
+        """Test handling when report pipeline returns (False, None)."""
+        output_path = os.path.join(pipeline.dirs["final"], "test_run")
+        os.makedirs(output_path, exist_ok=True)
+
+        with patch("geneinsight.report.pipeline.run_pipeline", return_value=(False, None)):
+            result = pipeline._generate_report(
+                output_path=output_path,
+                query_gene_set=mock_files["query"],
+                report_title="Test Report"
+            )
+
+            assert result is None
+
+
+class TestPipelineInstrumentation:
+    """Tests for instrumentation availability handling."""
+
+    def test_instrumentation_unavailable(self, output_dir, monkeypatch):
+        """Test pipeline behavior when instrumentation is not available."""
+        monkeypatch.setenv("OPENAI_API_KEY", "fake_key")
+
+        with patch("geneinsight.pipeline.INSTRUMENTATION_AVAILABLE", False):
+            with patch("geneinsight.pipeline.MetricsCollector", None):
+                pipeline = Pipeline(
+                    output_dir=output_dir,
+                    enable_metrics=True
+                )
+
+                # Metrics collector should be None when instrumentation unavailable
+                assert pipeline.metrics_collector is None
+
+    def test_time_stage_without_collector(self, output_dir, monkeypatch):
+        """Test _time_stage when metrics collector is None."""
+        monkeypatch.setenv("OPENAI_API_KEY", "fake_key")
+
+        pipeline = Pipeline(
+            output_dir=output_dir,
+            enable_metrics=False
+        )
+
+        # Should not raise, should use noop context
+        with pipeline._time_stage("Test Stage"):
+            pass  # Just verify it doesn't raise

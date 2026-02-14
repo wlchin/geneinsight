@@ -34,7 +34,7 @@ class TestGeneInsightCLI:
 
         # Pipeline is called only with keyword arguments, so `call_args` should be empty
         assert call_args == (), "Pipeline should only be called with keyword arguments."
-        
+
         # Verify the keyword arguments match the defaults
         expected_kwargs = {
             'output_dir': './output',
@@ -49,7 +49,13 @@ class TestGeneInsightCLI:
             'target_filtered_topics': 25,
             'species': 9606,
             'filtered_n_samples': 10,  # Added new default parameter
-            'api_temperature': 0.2  # Added new default parameter
+            'api_temperature': 0.2,  # Added new default parameter
+            'call_ncbi_api': False,  # Added new parameter
+            'use_local_stringdb': False,  # Added new parameter
+            'overlap_ratio_threshold': 0.25,  # Added new parameter
+            'enable_metrics': True,  # Added new parameter
+            'quiet_metrics': False,  # Added new parameter
+            'metrics_output_path': None  # Added new parameter
         }
         assert call_kwargs == expected_kwargs, "Pipeline got unexpected init kwargs."
 
@@ -91,10 +97,10 @@ class TestGeneInsightCLI:
             main()
 
         mock_pipeline.assert_called_once()
-        
+
         # Unpack the Pipeline call
         call_args, call_kwargs = mock_pipeline.call_args
-        
+
         # Ensure no positional arguments
         assert call_args == (), "Pipeline should only be called with keyword arguments."
 
@@ -112,7 +118,13 @@ class TestGeneInsightCLI:
             'target_filtered_topics': 30,
             'species': 10090,
             'filtered_n_samples': 15,  # Added new parameter
-            'api_temperature': 0.5  # Added new parameter
+            'api_temperature': 0.5,  # Added new parameter
+            'call_ncbi_api': False,  # Added new parameter (default)
+            'use_local_stringdb': False,  # Added new parameter (default)
+            'overlap_ratio_threshold': 0.25,  # Added new parameter (default)
+            'enable_metrics': True,  # Added new parameter (default)
+            'quiet_metrics': False,  # Added new parameter (default)
+            'metrics_output_path': None  # Added new parameter (default)
         }
         assert call_kwargs == expected_kwargs, (
             "Pipeline got unexpected init kwargs when passing all CLI parameters."
@@ -151,7 +163,8 @@ class TestGeneInsightCLI:
     def test_pipeline_exception(self, mock_pipeline):
         """
         Test that if the pipeline.run() raises an exception,
-        it bubbles up (or logs) appropriately. Here, we just ensure no crash.
+        it is caught and returns error code 1. The CLI now catches exceptions
+        and returns an error code instead of raising.
         """
         # Provide both required arguments
         test_args = [
@@ -162,10 +175,11 @@ class TestGeneInsightCLI:
         mock_pipeline_instance = mock_pipeline.return_value
         mock_pipeline_instance.run.side_effect = Exception("Pipeline error")
 
-        with patch.object(sys, "argv", test_args), pytest.raises(Exception) as excinfo:
-            main()
+        with patch.object(sys, "argv", test_args):
+            # main() now returns 1 on error instead of raising
+            result = main()
 
-        assert "Pipeline error" in str(excinfo.value)
+        assert result == 1  # Error return code
         # Check we tried to run the pipeline
         mock_pipeline.assert_called_once()
         mock_pipeline_instance.run.assert_called_once()

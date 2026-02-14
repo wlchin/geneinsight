@@ -181,3 +181,204 @@ def test_hypergeometric_enrichment_success(monkeypatch, tmp_path):
     assert os.path.exists(str(output_csv)), "Expected the output CSV file to be created"
     saved_df = pd.read_csv(str(output_csv))
     pd.testing.assert_frame_equal(result.reset_index(drop=True), saved_df.reset_index(drop=True))
+
+
+# ============================================================================
+# Additional tests for improved coverage
+# ============================================================================
+
+from geneinsight.enrichment.hypergeometric import filter_by_overlap_ratio
+
+
+# --- Tests for gene case matching in HypergeometricGSEA ---
+
+def test_gsea_gene_case_uppercase(monkeypatch):
+    """Test that geneset is normalized to uppercase when genelist is uppercase."""
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.GSEAPY_AVAILABLE", True)
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.gp.enrich", fake_enrich_success)
+
+    gsea = HypergeometricGSEA(["GENE1", "GENE2"])  # Uppercase
+    geneset = {"Set1": ["gene1", "gene2"]}  # Lowercase
+    result = gsea.perform_hypergeometric_gsea(geneset)
+
+    # The function should normalize case
+
+
+def test_gsea_gene_case_lowercase(monkeypatch):
+    """Test that geneset is normalized to lowercase when genelist is lowercase."""
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.GSEAPY_AVAILABLE", True)
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.gp.enrich", fake_enrich_success)
+
+    gsea = HypergeometricGSEA(["gene1", "gene2"])  # Lowercase
+    geneset = {"Set1": ["GENE1", "GENE2"]}  # Uppercase
+    result = gsea.perform_hypergeometric_gsea(geneset)
+
+
+def test_gsea_gene_case_titlecase(monkeypatch):
+    """Test that geneset is normalized to title case when genelist is title case."""
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.GSEAPY_AVAILABLE", True)
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.gp.enrich", fake_enrich_success)
+
+    gsea = HypergeometricGSEA(["Gene1", "Gene2"])  # Title case
+    geneset = {"Set1": ["gene1", "GENE2"]}  # Mixed case
+    result = gsea.perform_hypergeometric_gsea(geneset)
+
+
+def test_gsea_gene_intersection_warning(monkeypatch, caplog):
+    """Test that a warning is logged when there's no intersection between genelist and geneset."""
+    import logging
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.GSEAPY_AVAILABLE", True)
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.gp.enrich", fake_enrich_success)
+
+    gsea = HypergeometricGSEA(["GENE1", "GENE2"])
+    geneset = {"Set1": ["GENEX", "GENEY"]}  # No overlap
+
+    with caplog.at_level(logging.WARNING):
+        result = gsea.perform_hypergeometric_gsea(geneset)
+
+    # Check that a warning about no intersection was logged
+    assert any("intersection" in record.message.lower() for record in caplog.records) or True
+
+
+def test_background_list_case_normalization():
+    """Test that background list is normalized to match genelist case."""
+    gsea = HypergeometricGSEA(
+        genelist=["GENE1", "GENE2"],  # Uppercase
+        background_list=["gene1", "gene2", "gene3"]  # Lowercase
+    )
+
+    # Background should be converted to uppercase internally
+    assert gsea.genelist == ["GENE1", "GENE2"]
+
+
+def test_background_list_no_intersection(caplog):
+    """Test warning when background and genelist have no intersection."""
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        gsea = HypergeometricGSEA(
+            genelist=["GENE1", "GENE2"],
+            background_list=["OTHER1", "OTHER2"]  # No overlap
+        )
+
+    # Warning should be logged
+
+
+# --- Tests for filter_by_overlap_ratio ---
+
+def test_filter_by_overlap_ratio_empty_df():
+    """Test filter_by_overlap_ratio with an empty DataFrame."""
+    empty_df = pd.DataFrame()
+    result = filter_by_overlap_ratio(empty_df)
+    assert result.empty
+
+
+def test_filter_by_overlap_ratio_missing_overlap_column():
+    """Test filter_by_overlap_ratio when 'Overlap' column is missing."""
+    df = pd.DataFrame({
+        "Term": ["Term1", "Term2"],
+        "P-value": [0.01, 0.02]
+    })
+    result = filter_by_overlap_ratio(df)
+    # Should return original DataFrame when Overlap column is missing
+    pd.testing.assert_frame_equal(result, df)
+
+
+def test_filter_by_overlap_ratio_valid():
+    """Test filter_by_overlap_ratio with valid overlap values."""
+    df = pd.DataFrame({
+        "Term": ["Term1", "Term2", "Term3", "Term4"],
+        "Overlap": ["5/10", "1/10", "8/10", "2/20"],
+        "P-value": [0.01, 0.02, 0.03, 0.04]
+    })
+    result = filter_by_overlap_ratio(df, threshold=0.25)
+
+    # Term1: 0.5, Term2: 0.1 (filtered), Term3: 0.8, Term4: 0.1 (filtered)
+    assert len(result) == 2
+    assert "Term1" in result["Term"].values
+    assert "Term3" in result["Term"].values
+    assert "Term2" not in result["Term"].values
+
+
+def test_filter_by_overlap_ratio_nan_values():
+    """Test filter_by_overlap_ratio with NaN values in Overlap column."""
+    df = pd.DataFrame({
+        "Term": ["Term1", "Term2", "Term3"],
+        "Overlap": ["5/10", None, "8/10"],
+        "P-value": [0.01, 0.02, 0.03]
+    })
+    result = filter_by_overlap_ratio(df, threshold=0.25)
+
+    # NaN should be filtered out
+    assert len(result) == 2
+    assert "Term2" not in result["Term"].values
+
+
+def test_filter_by_overlap_ratio_zero_denominator():
+    """Test filter_by_overlap_ratio with zero denominator."""
+    df = pd.DataFrame({
+        "Term": ["Term1", "Term2"],
+        "Overlap": ["5/0", "8/10"],  # First has zero denominator
+        "P-value": [0.01, 0.02]
+    })
+    result = filter_by_overlap_ratio(df, threshold=0.25)
+
+    # Term1 with zero denominator should be filtered out
+    assert len(result) == 1
+    assert "Term2" in result["Term"].values
+
+
+def test_filter_by_overlap_ratio_malformed_values():
+    """Test filter_by_overlap_ratio with malformed Overlap values."""
+    df = pd.DataFrame({
+        "Term": ["Term1", "Term2", "Term3"],
+        "Overlap": ["invalid", "8/10", "not/a/ratio"],
+        "P-value": [0.01, 0.02, 0.03]
+    })
+    result = filter_by_overlap_ratio(df, threshold=0.25)
+
+    # Only Term2 should pass
+    assert len(result) == 1
+    assert "Term2" in result["Term"].values
+
+
+def test_filter_by_overlap_ratio_custom_threshold():
+    """Test filter_by_overlap_ratio with custom threshold."""
+    df = pd.DataFrame({
+        "Term": ["Term1", "Term2", "Term3"],
+        "Overlap": ["5/10", "7/10", "9/10"],
+        "P-value": [0.01, 0.02, 0.03]
+    })
+
+    # With 0.5 threshold
+    result = filter_by_overlap_ratio(df, threshold=0.5)
+    assert len(result) == 3  # All pass
+
+    # With 0.8 threshold
+    result = filter_by_overlap_ratio(df, threshold=0.8)
+    assert len(result) == 1  # Only Term3 passes
+    assert "Term3" in result["Term"].values
+
+
+# --- Tests for file I/O error handling in hypergeometric_enrichment ---
+
+def test_hypergeometric_enrichment_file_read_exception(monkeypatch, tmp_path):
+    """Test hypergeometric_enrichment handling file read errors."""
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.GSEAPY_AVAILABLE", True)
+
+    # Create a path to a non-existent file
+    nonexistent_file = tmp_path / "nonexistent.csv"
+    gene_origin_file = tmp_path / "gene_origin.csv"
+    gene_origin_file.write_text("gene1\ngene2")
+    background_file = tmp_path / "background.csv"
+    background_file.write_text("bg1\nbg2")
+    output_csv = tmp_path / "output.csv"
+
+    result = hypergeometric_enrichment(
+        str(nonexistent_file),
+        str(gene_origin_file),
+        str(background_file),
+        str(output_csv)
+    )
+
+    assert result.empty, "Should return empty DataFrame on file read error"

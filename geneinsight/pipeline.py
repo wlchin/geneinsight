@@ -10,6 +10,20 @@ from typing import Dict, Optional, Tuple
 # Rich for stage announcements
 from rich.console import Console
 
+# Import instrumentation
+try:
+    from .instrumentation import (
+        MetricsCollector,
+        TokenUsage,
+        PipelineMetrics,
+        format_metrics_summary,
+        format_duration
+    )
+    INSTRUMENTATION_AVAILABLE = True
+except ImportError:
+    INSTRUMENTATION_AVAILABLE = False
+    MetricsCollector = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,7 +46,12 @@ class Pipeline:
         filtered_n_samples: int = 10,  # parameter for filtered sets topic modeling
         api_temperature: float = 0.2,   # temperature parameter
         call_ncbi_api: bool = True,     # whether to call NCBI API for gene summaries
-        use_local_stringdb: bool = True  # whether to use local StringDB module instead of API (default now True)
+        use_local_stringdb: bool = True,  # whether to use local StringDB module instead of API (default now True)
+        overlap_ratio_threshold: float = 0.25,  # minimum overlap ratio to keep terms after hypergeometric enrichment
+        # Metrics/instrumentation options
+        enable_metrics: bool = True,      # whether to collect timing and token metrics
+        quiet_metrics: bool = False,      # suppress console metrics summary
+        metrics_output_path: Optional[str] = None  # custom path for metrics JSON
     ):
         self.output_dir = os.path.abspath(output_dir)
 
@@ -64,6 +83,12 @@ class Pipeline:
         self.api_temperature = api_temperature  # store temperature parameter
         self.call_ncbi_api = call_ncbi_api  # store NCBI API control parameter
         self.use_local_stringdb = use_local_stringdb  # store local StringDB option
+        self.overlap_ratio_threshold = overlap_ratio_threshold  # store overlap ratio threshold
+
+        # Metrics options
+        self.enable_metrics = enable_metrics
+        self.quiet_metrics = quiet_metrics
+        self.metrics_output_path = metrics_output_path
 
         # Create directories
         os.makedirs(self.output_dir, exist_ok=True)
@@ -94,10 +119,27 @@ class Pipeline:
         # Set timestamp for run
         self.timestamp = time.strftime("%Y%m%d_%H%M%S")
 
+        # Initialize metrics collector for timing and token tracking
+        self.metrics_collector = None
+        if INSTRUMENTATION_AVAILABLE and self.enable_metrics:
+            self.metrics_collector = MetricsCollector(model=self.api_model)
+
         logger.debug(f"Pipeline initialized with output directory: {self.output_dir}")
         logger.debug(f"Using temporary directory: {self.temp_dir}")
         logger.debug(f"Species: {self.species}, NCBI API calls: {'enabled' if self.call_ncbi_api else 'disabled'}")
         logger.debug(f"StringDB mode: {'local' if self.use_local_stringdb else 'API'}")
+
+    def _time_stage(self, stage_name: str):
+        """Context manager for timing a pipeline stage."""
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _noop_context():
+            yield
+
+        if self.metrics_collector:
+            return self.metrics_collector.time_stage(stage_name)
+        return _noop_context()
 
     def _check_openai_api_key(self):
         """Check if OpenAI API key is available in environment variables."""
@@ -131,6 +173,11 @@ class Pipeline:
         run_id = f"{gene_set_name}_{self.timestamp}"
         logger.info(f"Run ID: {run_id}")
 
+        # Start metrics collection
+        if self.metrics_collector:
+            self.metrics_collector.metrics.run_id = run_id
+            self.metrics_collector.start_pipeline()
+
         # Check for overlap between query and background
         try:
             self.console.print("[bold]Checking overlap between query and background...[/bold]")
@@ -153,130 +200,186 @@ class Pipeline:
         try:
             # Step 1: Gene enrichment from StringDB
             self.console.rule("[bold cyan]Step 1: Retrieving gene enrichment data from StringDB[/bold cyan]")
-            enrichment_df, documents_df = self._get_stringdb_enrichment(query_gene_set)
-            
-            # Check if enrichment or documents are empty
-            if enrichment_df.empty or documents_df.empty:
-                logger.error("No enrichment or documents returned from StringDB. Aborting pipeline.")
-                self.console.print("[bold red]ERROR: No enrichment or documents returned from StringDB. Aborting pipeline.[/bold red]")
-                raise ValueError("No enrichment or documents returned from StringDB. Pipeline aborted.")
-                
-            self.console.print(f"Retrieved {len(enrichment_df)} enriched terms and {len(documents_df)} documents from StringDB.")
+            with self._time_stage("Step 1: StringDB Enrichment"):
+                enrichment_df, documents_df = self._get_stringdb_enrichment(query_gene_set)
+
+                # Check if enrichment or documents are empty
+                if enrichment_df.empty or documents_df.empty:
+                    logger.error("No enrichment or documents returned from StringDB. Aborting pipeline.")
+                    self.console.print("[bold red]ERROR: No enrichment or documents returned from StringDB. Aborting pipeline.[/bold red]")
+                    raise ValueError("No enrichment or documents returned from StringDB. Pipeline aborted.")
+
+                self.console.print(f"Retrieved {len(enrichment_df)} enriched terms and {len(documents_df)} documents from StringDB.")
             self.console.print("[bold green]Done! Step 1 completed.[/bold green]")
 
             # Step 2: Topic modeling
             self.console.rule("[bold cyan]Step 2: Running topic modeling[/bold cyan]")
             self.console.print(f"Running topic modeling with {self.n_samples} rounds of sampling on {len(documents_df)} STRING-DB terms")
-            topics_df = self._run_topic_modeling(documents_df)
+            with self._time_stage("Step 2: Topic Modeling"):
+                topics_df = self._run_topic_modeling(documents_df)
             self.console.print("[bold green]Done! Step 2 completed.[/bold green]")
 
             # Step 3: Prompt generation
             self.console.rule("[bold cyan]Step 3: Generating prompts for topic refinement[/bold cyan]")
             self.console.print("Generating prompts for API calls")
-            prompts_df = self._generate_prompts(topics_df)
+            with self._time_stage("Step 3: Prompt Generation"):
+                prompts_df = self._generate_prompts(topics_df)
             self.console.print("[bold green]Done! Step 3 completed.[/bold green]")
 
             # Step 4: API processing
             self.console.rule("[bold cyan]Step 4: Processing prompts through API[/bold cyan]")
             self.console.print(f"[bold]Using API: {self.api_service} with {self.api_parallel_jobs} parallel jobs and temperature: {self.api_temperature}[/bold]")
-            api_results_df = self._process_api_calls(prompts_df)
+            with self._time_stage("Step 4: API Processing"):
+                api_results_df, api_metrics = self._process_api_calls(prompts_df)
+                # Record API metrics
+                if api_metrics and self.metrics_collector:
+                    stage = self.metrics_collector.metrics.stages.get("Step 4: API Processing")
+                    if stage:
+                        stage.api_calls = api_metrics.total_calls
+                        stage.token_usage = TokenUsage(
+                            prompt_tokens=api_metrics.prompt_tokens,
+                            completion_tokens=api_metrics.completion_tokens
+                        )
+                        stage.api_latencies_ms = api_metrics.latencies_ms
             self.console.print("[bold green]Done! Step 4 completed.[/bold green]")
 
             # Step 5: Create summary
             self.console.rule("[bold cyan]Step 5: Creating summary[/bold cyan]")
             self.console.print("Creating summary by combining API results with enrichment data")
-            summary_df = self._create_summary(api_results_df, enrichment_df)
+            with self._time_stage("Step 5: Create Summary"):
+                summary_df = self._create_summary(api_results_df, enrichment_df)
             self.console.print("[bold green]Done! Step 5 completed.[/bold green]")
 
             # Step 6: Hypergeometric enrichment
-            enriched_df = self._perform_hypergeometric_enrichment(
-                summary_df, query_gene_set, background_gene_list
-            )
+            self.console.rule("[bold cyan]Step 6: Hypergeometric Enrichment[/bold cyan]")
+            with self._time_stage("Step 6: Hypergeometric Enrichment"):
+                enriched_df = self._perform_hypergeometric_enrichment(
+                    summary_df, query_gene_set, background_gene_list
+                )
+                if enriched_df.empty:
+                    logger.error("Hypergeometric enrichment resulted in an empty DataFrame")
+                    raise ValueError("Hypergeometric enrichment resulted in an empty DataFrame")
+                self.console.print(f"Number of enriched gene sets: {len(enriched_df)}")
+            self.console.print("[bold green]Done! Step 6 completed.[/bold green]")
+
+            # Step 6b: Filter by overlap ratio
+            self.console.rule("[bold cyan]Step 6b: Filtering by overlap ratio[/bold cyan]")
+            with self._time_stage("Step 6b: Overlap Ratio Filter"):
+                pre_filter_count = len(enriched_df)
+                enriched_df = self._filter_by_overlap_ratio(enriched_df)
+                self.console.print(f"Filtered from {pre_filter_count} to {len(enriched_df)} terms (threshold={self.overlap_ratio_threshold})")
+            self.console.print("[bold green]Done! Step 6b completed.[/bold green]")
+
             if enriched_df.empty:
-                logger.error("Hypergeometric enrichment resulted in an empty DataFrame")
-                raise ValueError("Hypergeometric enrichment resulted in an empty DataFrame")
-            self.console.print(f"Number of enriched gene sets: {len(enriched_df)}")
+                logger.error("All terms filtered out by overlap ratio filter")
+                raise ValueError("All terms filtered out by overlap ratio filter. Consider lowering the overlap_ratio_threshold.")
 
             # Step 7: Topic modeling on filtered gene sets (meta-analysis)
             self.console.rule("[bold cyan]Step 7: Running topic modeling on filtered gene sets[/bold cyan]")
             self.console.print(f"Running topic modeling on filtered gene sets using {self.filtered_n_samples} samples")
-            topics_df = self._run_topic_modeling_on_filtered_sets(enriched_df)
+            with self._time_stage("Step 7: Filtered Topic Modeling"):
+                topics_df = self._run_topic_modeling_on_filtered_sets(enriched_df)
             self.console.print("[bold green]Done! Step 7 completed.[/bold green]")
 
             # Step 8: Extract key topics
             self.console.rule("[bold cyan]Step 8: Extracting key topics[/bold cyan]")
             self.console.print("Detecting key topics (centroids) from the enriched gene sets")
-            key_topics_df = self._get_key_topics(topics_df)
+            with self._time_stage("Step 8: Key Topics Extraction"):
+                key_topics_df = self._get_key_topics(topics_df)
             self.console.print("[bold green]Done! Step 8 completed.[/bold green]")
 
             # Step 9: Filter topics by similarity
             self.console.rule("[bold cyan]Step 9: Filtering topics by similarity[/bold cyan]")
             self.console.print("Filtering topics for report generation")
             self.console.print("Number of key topics before filtering: ", len(key_topics_df))
-            filtered_df = self._filter_topics(key_topics_df)
-            self.console.print(f"Number of topics filtered for report: {len(filtered_df)}")
-            self.console.print("[bold green]Done! Step 9 completed.[/bold green]")
+            with self._time_stage("Step 9: Similarity Filtering"):
+                filtered_df = self._filter_topics(key_topics_df)
+                self.console.print(f"Number of topics filtered for report: {len(filtered_df)}")
 
-            if len(filtered_df) < self.target_filtered_topics:
-                logger.info("Filtered topics fewer than target; using entire enriched dataframe for filtering and clustering.")
-                filtered_df = self._filter_topics(enriched_df)
+                if len(filtered_df) < self.target_filtered_topics:
+                    logger.info("Filtered topics fewer than target; using entire enriched dataframe for filtering and clustering.")
+                    filtered_df = self._filter_topics(enriched_df)
+            self.console.print("[bold green]Done! Step 9 completed.[/bold green]")
 
             # Step 9b: Clustering filtered topics
             self.console.rule("[bold cyan]Step 9b: Clustering filtered topics[/bold cyan]")
             self.console.print("Creating hierarchical summaries")
-            clustered_df = self._run_clustering(filtered_df)
+            with self._time_stage("Step 9b: Clustering"):
+                clustered_df = self._run_clustering(filtered_df)
             self.console.print("[bold green]Done! Step 9b completed.[/bold green]")
 
             # Step 9c: Ontology enrichment analysis
             self.console.rule("[bold cyan]Step 9c: Performing ontology enrichment analysis[/bold cyan]")
             self.console.print("Running ontology enrichment analysis against GO and HPO ontologies")
-            ontology_dict_df = self._perform_ontology_enrichment(
-                summary_df=summary_df,
-                clustered_df=clustered_df,
-                query_gene_set=query_gene_set,
-                background_gene_list=background_gene_list
-            )
+            with self._time_stage("Step 9c: Ontology Enrichment"):
+                ontology_dict_df = self._perform_ontology_enrichment(
+                    summary_df=summary_df,
+                    clustered_df=clustered_df,
+                    query_gene_set=query_gene_set,
+                    background_gene_list=background_gene_list
+                )
             self.console.print("[bold green]Done! Step 9c completed.[/bold green]")
 
             # Step 10: Finalize outputs
             self.console.rule("[bold cyan]Step 10: Finalizing outputs[/bold cyan]")
             self.console.print("Generating report metadata and checking output files ...")
-            output_path = self._finalize_outputs(
-                run_id,
-                {
-                    "enrichment": enrichment_df,
-                    "documents": documents_df,
-                    "topics": topics_df,
-                    "prompts": prompts_df,
-                    "api_results": api_results_df,
-                    "summary": summary_df,
-                    "enriched": enriched_df,
-                    "key_topics": key_topics_df,
-                    "clustered": clustered_df,
-                    "ontology_dict": ontology_dict_df,
-                }
-            )
+            with self._time_stage("Step 10: Finalize Outputs"):
+                output_path = self._finalize_outputs(
+                    run_id,
+                    {
+                        "enrichment": enrichment_df,
+                        "documents": documents_df,
+                        "topics": topics_df,
+                        "prompts": prompts_df,
+                        "api_results": api_results_df,
+                        "summary": summary_df,
+                        "enriched": enriched_df,
+                        "key_topics": key_topics_df,
+                        "clustered": clustered_df,
+                        "ontology_dict": ontology_dict_df,
+                    }
+                )
             self.console.print("[bold green]Done! Step 10 completed.[/bold green]")
 
             # Step 11: Generate report (if requested)
             if generate_report:
                 self.console.rule("[bold cyan]Step 11: Generating report[/bold cyan]")
-                report_output = self._generate_report(
-                    output_path=output_path,
-                    query_gene_set=query_gene_set,
-                    report_title=report_title
-                )
-                if report_output:
-                    logger.info(f"Report generated successfully at {report_output}")
-                else:
-                    logger.warning("Report generation failed or was skipped")
+                with self._time_stage("Step 11: Report Generation"):
+                    report_output = self._generate_report(
+                        output_path=output_path,
+                        query_gene_set=query_gene_set,
+                        report_title=report_title
+                    )
+                    if report_output:
+                        logger.info(f"Report generated successfully at {report_output}")
+                    else:
+                        logger.warning("Report generation failed or was skipped")
                 self.console.print("[bold green]Done! Step 11 completed.[/bold green]")
 
             # Step 12: Reorganize output directory
             self.console.rule("[bold cyan]Step 12: Reorganizing output directory[/bold cyan]")
-            if os.path.isdir(output_path):
-                self._reorganize_output_directory(output_path)
+            with self._time_stage("Step 12: Reorganize Output"):
+                if os.path.isdir(output_path):
+                    self._reorganize_output_directory(output_path)
             self.console.print("[bold green]Done! Step 12 completed.[/bold green]")
+
+            # Finalize and display metrics
+            if self.metrics_collector:
+                metrics = self.metrics_collector.finalize()
+
+                # Save metrics to JSON file
+                if self.metrics_output_path:
+                    metrics_path = self.metrics_output_path
+                else:
+                    metrics_path = os.path.join(output_path, "pipeline_metrics.json")
+                self.metrics_collector.save(metrics_path)
+
+                # Display metrics summary (unless quiet mode)
+                if not self.quiet_metrics:
+                    self.console.print("")
+                    self.console.rule("[bold magenta]Pipeline Metrics Summary[/bold magenta]")
+                    summary = format_metrics_summary(metrics)
+                    self.console.print(summary)
 
             self.console.print("[bold green]Pipeline completed successfully![/bold green]")
             self.console.print(f"Results available at: [bold]{output_path + '.zip'}[/bold]")
@@ -445,15 +548,20 @@ class Pipeline:
         )
         return prompts_df
 
-    def _process_api_calls(self, prompts_df: pd.DataFrame) -> pd.DataFrame:
-        """Process prompts through API without caching."""
+    def _process_api_calls(self, prompts_df: pd.DataFrame) -> Tuple[pd.DataFrame, Optional[any]]:
+        """Process prompts through API without caching.
+
+        Returns:
+            Tuple of (api_results_df, batch_metrics) where batch_metrics contains
+            token usage and latency statistics.
+        """
         from .api.client import batch_process_api_calls
         prompts_path = os.path.join(self.dirs["prompts"], "prompts.csv")
         api_output = os.path.join(self.dirs["minor_topics"], "api_results.csv")
         if not os.path.exists(prompts_path):
             prompts_df.to_csv(prompts_path, index=False)
         logger.info("Running API calls without caching.")
-        api_results_df = batch_process_api_calls(
+        api_results_df, batch_metrics = batch_process_api_calls(
             prompts_csv=prompts_path,
             output_api=api_output,
             service=self.api_service,
@@ -462,7 +570,7 @@ class Pipeline:
             n_jobs=self.api_parallel_jobs,
             temperature=self.api_temperature  # pass temperature parameter
         )
-        return api_results_df
+        return api_results_df, batch_metrics
 
     def _create_summary(self, api_results_df: pd.DataFrame, enrichment_df: pd.DataFrame) -> pd.DataFrame:
         """Create summary by combining API results with enrichment data."""
@@ -494,6 +602,11 @@ class Pipeline:
             pvalue_threshold=self.pvalue_threshold
         )
         return enriched_df
+
+    def _filter_by_overlap_ratio(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Filter enriched terms by overlap ratio."""
+        from .enrichment.hypergeometric import filter_by_overlap_ratio
+        return filter_by_overlap_ratio(df, threshold=self.overlap_ratio_threshold)
 
     def _run_topic_modeling_on_filtered_sets(self, filtered_df: pd.DataFrame) -> pd.DataFrame:
         """Run topic modeling on the filtered gene sets (meta-analysis)."""
@@ -680,6 +793,8 @@ if __name__ == "__main__":
                         help="Sampling temperature for API calls (default: 0.2).")
     parser.add_argument("--no-ncbi-api", action="store_true", help="Disable NCBI API calls for gene summaries.")
     parser.add_argument("--use-local-stringdb", action="store_true", help="Use local StringDB module instead of API.")
+    parser.add_argument("--overlap_ratio_threshold", type=float, default=0.25,
+                        help="Minimum overlap ratio threshold for filtering terms (default: 0.25).")
     parser.add_argument("-v", "--verbosity",
                         default="info",
                         choices=["none", "debug", "info", "warning", "error", "critical"],
@@ -717,7 +832,8 @@ if __name__ == "__main__":
         filtered_n_samples=args.filtered_n_samples,
         api_temperature=args.api_temperature,
         call_ncbi_api=not args.no_ncbi_api,
-        use_local_stringdb=args.use_local_stringdb  # Pass the local StringDB option
+        use_local_stringdb=args.use_local_stringdb,  # Pass the local StringDB option
+        overlap_ratio_threshold=args.overlap_ratio_threshold  # Pass the overlap ratio threshold
     )
 
     pipeline.run(

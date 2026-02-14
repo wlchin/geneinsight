@@ -223,3 +223,47 @@ def hypergeometric_enrichment(
             logger.error(f"Error saving results: {e}")
     
     return result
+
+
+def filter_by_overlap_ratio(df: pd.DataFrame, threshold: float = 0.25) -> pd.DataFrame:
+    """
+    Filter enriched terms by overlap ratio.
+
+    The overlap ratio measures how many genes in a term overlap with the query gene set.
+    Terms with low overlap ratios tend to be generic/non-specific.
+
+    Args:
+        df: DataFrame with 'Overlap' column (format: "n/m")
+        threshold: Minimum overlap ratio to keep (default: 0.25)
+
+    Returns:
+        Filtered DataFrame with only terms meeting threshold
+    """
+    if df.empty:
+        logger.warning("Empty DataFrame passed to filter_by_overlap_ratio")
+        return df
+
+    if 'Overlap' not in df.columns:
+        logger.warning("'Overlap' column not found in DataFrame, skipping overlap ratio filter")
+        return df
+
+    def parse_overlap(overlap_str):
+        if pd.isna(overlap_str):
+            return None
+        try:
+            num, denom = str(overlap_str).split("/")
+            return int(num) / int(denom) if int(denom) > 0 else None
+        except (ValueError, ZeroDivisionError):
+            return None
+
+    df = df.copy()
+    df['overlap_ratio'] = df['Overlap'].apply(parse_overlap)
+
+    # Count terms that will be filtered
+    pre_filter_count = len(df)
+    filtered = df[df['overlap_ratio'] >= threshold].drop(columns=['overlap_ratio'])
+    post_filter_count = len(filtered)
+
+    logger.info(f"Overlap filter: {pre_filter_count} → {post_filter_count} terms (threshold={threshold})")
+
+    return filtered

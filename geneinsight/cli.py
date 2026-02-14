@@ -55,11 +55,22 @@ def main():
     # New argument for using local StringDB instead of API
     parser.add_argument("--use-local-stringdb", action="store_true",
                         help="Use local StringDB module instead of API (API is default).")
+    # New argument for overlap ratio filtering
+    parser.add_argument("--overlap_ratio_threshold", type=float, default=0.25,
+                        help="Minimum overlap ratio threshold for filtering terms (default: 0.25).")
     # Argument for controlling verbosity
     parser.add_argument("-v", "--verbosity",
                         default="none",
                         choices=["none", "debug", "info", "warning", "error", "critical"],
                         help="Set logging verbosity. Use 'none' to disable logging. Default is 'none'.")
+
+    # Instrumentation/metrics arguments
+    parser.add_argument("--no-metrics", action="store_true",
+                        help="Disable pipeline metrics collection (timing and token tracking).")
+    parser.add_argument("--quiet-metrics", action="store_true",
+                        help="Suppress console display of metrics summary (still saves to JSON).")
+    parser.add_argument("--metrics-output", type=str, default=None,
+                        help="Custom path for pipeline_metrics.json output file.")
 
     args = parser.parse_args()
 
@@ -112,7 +123,12 @@ def main():
         filtered_n_samples=args.filtered_n_samples,
         api_temperature=args.api_temperature,  # pass temperature parameter
         call_ncbi_api=args.enable_ncbi_api,    # NCBI API calls disabled by default, enabled with flag
-        use_local_stringdb=args.use_local_stringdb  # Use local StringDB module if flag is set
+        use_local_stringdb=args.use_local_stringdb,  # Use local StringDB module if flag is set
+        overlap_ratio_threshold=args.overlap_ratio_threshold,  # Overlap ratio threshold for filtering
+        # Metrics options
+        enable_metrics=not args.no_metrics,
+        quiet_metrics=args.quiet_metrics,
+        metrics_output_path=args.metrics_output
     )
 
     try:

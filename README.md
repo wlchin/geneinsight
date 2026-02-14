@@ -1,8 +1,8 @@
 # Geneinsight
 
 ![MIT License](https://img.shields.io/badge/license-MIT-blue)
-![Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen)
-![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
+![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)
+![Python 3.10-3.13](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12%20|%203.13-blue)
 
 A Python package for topic modeling of gene sets with enrichment analysis.
 
@@ -33,6 +33,8 @@ The documentation includes detailed API references, examples, and advanced usage
   - [Quick Installation](#quick-installation)
   - [Installation with Virtual Environment](#installation-with-virtual-environment-recommended)
 - [Command Line Interface](#command-line-interface)
+  - [Gene Set Size Recommendations](#gene-set-size-recommendations)
+  - [Basic Usage](#basic-usage)
   - [Available Options](#available-options)
   - [Multi-Species Support](#multi-species-support)
   - [Gene Summary Options](#gene-summary-options)
@@ -40,6 +42,7 @@ The documentation includes detailed API references, examples, and advanced usage
 - [API Support](#api-support)
 - [Environment Variables](#environment-variables)
 - [Output Format](#output-format)
+- [Pipeline Metrics](#pipeline-metrics)
 - [Interactive Report](#interactive-report)
 - [Examples](#examples)
 - [Reproducibility](#reproducibility)
@@ -97,6 +100,17 @@ uv pip install git+https://github.com/wlchin/geneinsight.git
 
 ## Command Line Interface
 
+### Gene Set Size Recommendations
+
+For optimal results, we recommend keeping query gene sets to **500 genes or fewer**, consistent with standard gene set enrichment analysis guidelines. Larger gene sets may:
+- Reduce the specificity of identified biological themes
+- Increase processing time and API costs
+- Yield less interpretable results
+
+There is no hard-coded limit, but results are most meaningful when analyzing focused gene sets derived from differential expression, GWAS hits, or other targeted analyses.
+
+### Basic Usage
+
 ```bash
 # Basic usage
 geneinsight query_genes.txt background_genes.txt -o ./output
@@ -136,7 +150,9 @@ usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
                    [--target_filtered_topics TARGET_FILTERED_TOPICS] [--temp_dir TEMP_DIR]
                    [--report_title REPORT_TITLE] [--species SPECIES]
                    [--filtered_n_samples FILTERED_N_SAMPLES] [--enable-ncbi-api]
-                   [--use-local-stringdb] [-v {none,debug,info,warning,error,critical}]
+                   [--use-local-stringdb] [--overlap_ratio_threshold OVERLAP_RATIO_THRESHOLD]
+                   [--no-metrics] [--quiet-metrics] [--metrics-output METRICS_OUTPUT]
+                   [-v {none,debug,info,warning,error,critical}]
                    query_gene_set background_gene_list
 ```
 
@@ -162,6 +178,10 @@ usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
 | `--use-local-stringdb`  | Use local StringDB module instead of API               | False    |
 | `-v`, `--verbosity`      | Set logging verbosity                                  | none     |
 | `--api_temperature`     | Sampling temperature for API calls                     | 0.2      |
+| `--overlap_ratio_threshold` | Minimum overlap ratio threshold for filtering terms | 0.25     |
+| `--no-metrics`          | Disable pipeline metrics collection                    | False    |
+| `--quiet-metrics`       | Suppress console display of metrics summary            | False    |
+| `--metrics-output`      | Custom path for pipeline_metrics.json output           | None     |
 
 ### Multi-Species Support
 
@@ -245,6 +265,28 @@ The pipeline produces a directory (which can be optionally zipped) containing:
 - `enriched.csv`: Hypergeometric enrichment results
 - `filtered.csv`: Final filtered topics
 - `metadata.csv`: Run information and parameters
+- `pipeline_metrics.json`: Timing and token usage metrics (unless disabled with `--no-metrics`)
+
+## Pipeline Metrics
+
+Geneinsight tracks detailed metrics for each pipeline run, including:
+
+- **Stage timing**: Duration of each pipeline step
+- **Token usage**: Prompt and completion tokens consumed by API calls
+- **API statistics**: Number of calls and latency information
+
+By default, a summary is displayed after each run and saved to `pipeline_metrics.json` in the output directory. Control this behavior with:
+
+```bash
+# Disable metrics collection entirely
+geneinsight query_genes.txt background_genes.txt --no-metrics
+
+# Collect metrics but suppress console output
+geneinsight query_genes.txt background_genes.txt --quiet-metrics
+
+# Save metrics to a custom location
+geneinsight query_genes.txt background_genes.txt --metrics-output /path/to/metrics.json
+```
 
 ## Interactive Report
 

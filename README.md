@@ -109,6 +109,19 @@ For optimal results, we recommend keeping query gene sets to **500 genes or fewe
 
 There is no hard-coded limit, but results are most meaningful when analyzing focused gene sets derived from differential expression, GWAS hits, or other targeted analyses.
 
+### Input File Format
+
+Both query and background gene files should be plain text files with **one gene per line** and **no header row**:
+
+```
+TP53
+BRCA1
+EGFR
+MYC
+```
+
+Gene identifiers can be gene symbols (e.g., `TP53`) or Ensembl IDs (e.g., `ENSG00000141510`). The pipeline will automatically convert Ensembl IDs to gene symbols via StringDB.
+
 ### Basic Usage
 
 ```bash

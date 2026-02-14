@@ -18,7 +18,6 @@ from openai import OpenAI
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
-import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 dotenv.load_dotenv()

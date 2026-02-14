@@ -14,7 +14,6 @@ import pandas as pd
 import re
 import shutil
 import os
-import logging
 
 # Species-specific pathway prefixes for KEGG and other databases
 SPECIES_PATHWAY_PREFIX = {

@@ -13,7 +13,6 @@ from pydantic import BaseModel, Field
 logging.getLogger("httpx").disabled = True
 
 logger = logging.getLogger(__name__)
-import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Import instrumentation utilities

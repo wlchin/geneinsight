@@ -20,22 +20,22 @@ geneinsight sample.txt sample_background.txt -o ./my_results
 ```bash
 # Using GPT-4o-mini (default)
 geneinsight sample.txt sample_background.txt -o ./openai_results \
-  --api_service openai \
-  --api_model gpt-4o-mini
+  --api-service openai \
+  --api-model gpt-4o-mini
 
 # Using GPT-4o
 geneinsight sample.txt sample_background.txt -o ./openai_gpt4o_results \
-  --api_service openai \
-  --api_model gpt-4o
+  --api-service openai \
+  --api-model gpt-4o
 ```
 
 ### Using Ollama with Local Models
 ```bash
 # Using Llama 3.1 with Ollama
 geneinsight sample.txt sample_background.txt -o ./ollama_results \
-  --api_service ollama \
-  --api_model llama3.1:8b \
-  --api_base_url "http://localhost:11434/v1"
+  --api-service ollama \
+  --api-model llama3.1:8b \
+  --api-base-url "http://localhost:11434/v1"
 ```
 
 ## Increasing Parallel API Calls
@@ -45,7 +45,7 @@ Speed up your analysis by processing multiple topics simultaneously:
 ```bash
 # Process 4 topics in parallel
 geneinsight sample.txt sample_background.txt -o ./parallel_results \
-  --api_parallel_jobs 4
+  --api-parallel-jobs 4
 ```
 
 ## Report Generation
@@ -55,7 +55,7 @@ Customize your analysis reports:
 ```bash
 # Generate report with custom title
 geneinsight sample.txt sample_background.txt -o ./report_results \
-  --report_title "My Gene Analysis"
+  --report-title "My Gene Analysis"
 
 # Run analysis without generating a report
 geneinsight sample.txt sample_background.txt -o ./no_report_results \

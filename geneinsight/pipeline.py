@@ -776,29 +776,29 @@ if __name__ == "__main__":
     parser.add_argument("--species", type=int, default=9606, help="Species identifier (default: 9606 for human).")
     parser.add_argument("query_gene_set", help="Path to file containing query gene set.")
     parser.add_argument("background_gene_list", help="Path to file containing background gene list.")
-    parser.add_argument("-o", "--output_dir", default="./output", help="Directory to store final outputs.")
+    parser.add_argument("-o", "--output-dir", default="./output", help="Directory to store final outputs.")
     parser.add_argument("--no-report", action="store_true", help="Skip generating an HTML report.")
-    parser.add_argument("--n_samples", type=int, default=5, help="Number of topic models to run with different seeds.")
-    parser.add_argument("--num_topics", type=int, default=None, help="Number of topics to extract in topic modeling.")
-    parser.add_argument("--pvalue_threshold", type=float, default=0.05, help="Adjusted P-value threshold.")
-    parser.add_argument("--api_service", type=str, default="openai", help="API service for topic refinement.")
-    parser.add_argument("--api_model", type=str, default="gpt-4o-mini", help="Model name for the API service.")
-    parser.add_argument("--api_parallel_jobs", type=int, default=4, help="Number of parallel API jobs.")
-    parser.add_argument("--api_base_url", type=str, default=None, help="Base URL for the API service, if needed.")
-    parser.add_argument("--target_filtered_topics", type=int, default=25, help="Target number of topics.")
-    parser.add_argument("--temp_dir", type=str, default=None, help="Temporary directory for intermediate files.")
-    parser.add_argument("--report_title", type=str, default=None, help="Title for the generated report.")
-    parser.add_argument("--filtered_n_samples", type=int, default=10, help="Number of topic models to run on filtered sets.")
-    parser.add_argument("--api_temperature", type=float, default=0.2,
+    parser.add_argument("--n-samples", type=int, default=5, help="Number of topic models to run with different seeds.")
+    parser.add_argument("--num-topics", type=int, default=None, help="Number of topics to extract in topic modeling.")
+    parser.add_argument("--pvalue-threshold", type=float, default=0.05, help="Adjusted P-value threshold.")
+    parser.add_argument("--api-service", type=str, default="openai", help="API service for topic refinement.")
+    parser.add_argument("--api-model", type=str, default="gpt-4o-mini", help="Model name for the API service.")
+    parser.add_argument("--api-parallel-jobs", type=int, default=1, help="Number of parallel API jobs.")
+    parser.add_argument("--api-base-url", type=str, default=None, help="Base URL for the API service, if needed.")
+    parser.add_argument("--target-filtered-topics", type=int, default=25, help="Target number of topics.")
+    parser.add_argument("--temp-dir", type=str, default=None, help="Temporary directory for intermediate files.")
+    parser.add_argument("--report-title", type=str, default=None, help="Title for the generated report.")
+    parser.add_argument("--filtered-n-samples", type=int, default=10, help="Number of topic models to run on filtered sets.")
+    parser.add_argument("--api-temperature", type=float, default=0.2,
                         help="Sampling temperature for API calls (default: 0.2).")
     parser.add_argument("--no-ncbi-api", action="store_true", help="Disable NCBI API calls for gene summaries.")
     parser.add_argument("--use-local-stringdb", action="store_true", help="Use local StringDB module instead of API.")
-    parser.add_argument("--overlap_ratio_threshold", type=float, default=0.25,
+    parser.add_argument("--overlap-ratio-threshold", type=float, default=0.25,
                         help="Minimum overlap ratio threshold for filtering terms (default: 0.25).")
     parser.add_argument("-v", "--verbosity",
-                        default="info",
+                        default="none",
                         choices=["none", "debug", "info", "warning", "error", "critical"],
-                        help="Set logging verbosity (default: 'info'). Use 'none' to disable logging.")
+                        help="Set logging verbosity (default: 'none'). Use 'none' to disable logging.")
     
     args = parser.parse_args()
 

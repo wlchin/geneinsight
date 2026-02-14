@@ -79,19 +79,19 @@ class TestGeneInsightCLI:
             "background.txt",
             "-o", "my_output",
             "--no-report",
-            "--n_samples", "10",
-            "--num_topics", "20",
-            "--pvalue_threshold", "0.01",
-            "--api_service", "anthropic",
-            "--api_model", "claude-3",
-            "--api_parallel_jobs", "25",
-            "--api_base_url", "https://example.com/api",
-            "--target_filtered_topics", "30",
-            "--temp_dir", "my_temp_dir",
-            "--report_title", "My Custom Title",
+            "--n-samples", "10",
+            "--num-topics", "20",
+            "--pvalue-threshold", "0.01",
+            "--api-service", "anthropic",
+            "--api-model", "claude-3",
+            "--api-parallel-jobs", "25",
+            "--api-base-url", "https://example.com/api",
+            "--target-filtered-topics", "30",
+            "--temp-dir", "my_temp_dir",
+            "--report-title", "My Custom Title",
             "--species", "10090",  # Mouse
-            "--filtered_n_samples", "15",
-            "--api_temperature", "0.5"
+            "--filtered-n-samples", "15",
+            "--api-temperature", "0.5"
         ]
         with patch.object(sys, "argv", test_args):
             main()
@@ -193,8 +193,8 @@ class TestGeneInsightCLI:
             "geneinsight",
             "query.txt",
             "background.txt",
-            "--filtered_n_samples", "20",
-            "--api_temperature", "0.7"
+            "--filtered-n-samples", "20",
+            "--api-temperature", "0.7"
         ]
         with patch.object(sys, "argv", test_args):
             main()

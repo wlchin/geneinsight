@@ -17,48 +17,42 @@ def main():
     )
     parser.add_argument("query_gene_set", help="Path to file containing the query gene set.")
     parser.add_argument("background_gene_list", help="Path to file containing the background gene list.")
-    parser.add_argument("-o", "--output_dir", default="./output",
+    parser.add_argument("-o", "--output-dir", default="./output",
                         help="Directory to store final outputs. Default: './output'")
     parser.add_argument("--no-report", action="store_true",
                         help="Skip generating an HTML report.")
-    parser.add_argument("--n_samples", type=int, default=5,
+    parser.add_argument("--n-samples", type=int, default=5,
                         help="Number of topic models to run with different seeds (default 5).")
-    parser.add_argument("--num_topics", type=int, default=None,
+    parser.add_argument("--num-topics", type=int, default=None,
                         help="Number of topics to extract in topic modeling (default None).")
-    parser.add_argument("--pvalue_threshold", type=float, default=0.05,
+    parser.add_argument("--pvalue-threshold", type=float, default=0.05,
                         help="Adjusted P-value threshold for filtering results (default 0.05).")
-    parser.add_argument("--api_service", type=str, default="openai",
+    parser.add_argument("--api-service", type=str, default="openai",
                         help="API service for topic refinement (default 'openai').")
-    parser.add_argument("--api_model", type=str, default="gpt-4o-mini",
+    parser.add_argument("--api-model", type=str, default="gpt-4o-mini",
                         help="Model name for the API service (default 'gpt-4o-mini').")
-    parser.add_argument("--api_parallel_jobs", type=int, default=1,
+    parser.add_argument("--api-parallel-jobs", type=int, default=1,
                         help="Number of parallel API jobs (default 1).")
-    parser.add_argument("--api_base_url", type=str, default=None,
+    parser.add_argument("--api-base-url", type=str, default=None,
                         help="Base URL for the API service, if needed.")
-    parser.add_argument("--target_filtered_topics", type=int, default=25,
+    parser.add_argument("--target-filtered-topics", type=int, default=25,
                         help="Target number of topics after filtering (default 25).")
-    parser.add_argument("--temp_dir", type=str, default=None,
+    parser.add_argument("--temp-dir", type=str, default=None,
                         help="Temporary directory for intermediate files.")
-    parser.add_argument("--report_title", type=str, default=None,
+    parser.add_argument("--report-title", type=str, default=None,
                         help="Title for the generated report.")
     parser.add_argument("--species", type=int, default=9606,
                         help="Species identifier (default: 9606 for human).")
-    # New argument for controlling number of topic models on filtered sets
-    parser.add_argument("--filtered_n_samples", type=int, default=10,
+    parser.add_argument("--filtered-n-samples", type=int, default=10,
                         help="Number of topic models to run on filtered sets (default 10).")
-    # New argument for controlling API temperature
-    parser.add_argument("--api_temperature", type=float, default=0.2,
+    parser.add_argument("--api-temperature", type=float, default=0.2,
                         help="Sampling temperature for API calls (default: 0.2).")
-    # Changed from --no-ncbi-api to --enable-ncbi-api to make disabled the default
     parser.add_argument("--enable-ncbi-api", action="store_true",
                         help="Enable NCBI API calls for gene summaries (disabled by default).")
-    # New argument for using local StringDB instead of API
     parser.add_argument("--use-local-stringdb", action="store_true",
                         help="Use local StringDB module instead of API (API is default).")
-    # New argument for overlap ratio filtering
-    parser.add_argument("--overlap_ratio_threshold", type=float, default=0.25,
+    parser.add_argument("--overlap-ratio-threshold", type=float, default=0.25,
                         help="Minimum overlap ratio threshold for filtering terms (default: 0.25).")
-    # Argument for controlling verbosity
     parser.add_argument("-v", "--verbosity",
                         default="none",
                         choices=["none", "debug", "info", "warning", "error", "critical"],

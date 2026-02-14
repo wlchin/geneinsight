@@ -117,18 +117,18 @@ geneinsight query_genes.txt background_genes.txt -o ./output
 
 # Advanced usage with OpenAI API
 geneinsight query_genes.txt background_genes.txt \
-  --n_samples 5 \
-  --num_topics 10 \
-  --pvalue_threshold 0.05 \
-  --api_service openai \
-  --api_model gpt-4o-mini \
-  --api_temperature 0.2
+  --n-samples 5 \
+  --num-topics 10 \
+  --pvalue-threshold 0.05 \
+  --api-service openai \
+  --api-model gpt-4o-mini \
+  --api-temperature 0.2
 
 # Using Ollama with local LLM
 geneinsight query_genes.txt background_genes.txt \
-  --api_service ollama \
-  --api_model llama3.1:8b \
-  --api_base_url "http://localhost:11434/v1"
+  --api-service ollama \
+  --api-model llama3.1:8b \
+  --api-base-url "http://localhost:11434/v1"
 
 # Using a different species (mouse)
 geneinsight query_genes.txt background_genes.txt --species 10090
@@ -143,14 +143,14 @@ geneinsight query_genes.txt background_genes.txt --use-local-stringdb
 ### Available Options
 
 ```
-usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
-                   [--num_topics NUM_TOPICS] [--pvalue_threshold PVALUE_THRESHOLD]
-                   [--api_service API_SERVICE] [--api_model API_MODEL] [--api_temperature API_TEMPERATURE]
-                   [--api_parallel_jobs API_PARALLEL_JOBS] [--api_base_url API_BASE_URL]
-                   [--target_filtered_topics TARGET_FILTERED_TOPICS] [--temp_dir TEMP_DIR]
-                   [--report_title REPORT_TITLE] [--species SPECIES]
-                   [--filtered_n_samples FILTERED_N_SAMPLES] [--enable-ncbi-api]
-                   [--use-local-stringdb] [--overlap_ratio_threshold OVERLAP_RATIO_THRESHOLD]
+usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n-samples N_SAMPLES]
+                   [--num-topics NUM_TOPICS] [--pvalue-threshold PVALUE_THRESHOLD]
+                   [--api-service API_SERVICE] [--api-model API_MODEL] [--api-temperature API_TEMPERATURE]
+                   [--api-parallel-jobs API_PARALLEL_JOBS] [--api-base-url API_BASE_URL]
+                   [--target-filtered-topics TARGET_FILTERED_TOPICS] [--temp-dir TEMP_DIR]
+                   [--report-title REPORT_TITLE] [--species SPECIES]
+                   [--filtered-n-samples FILTERED_N_SAMPLES] [--enable-ncbi-api]
+                   [--use-local-stringdb] [--overlap-ratio-threshold OVERLAP_RATIO_THRESHOLD]
                    [--no-metrics] [--quiet-metrics] [--metrics-output METRICS_OUTPUT]
                    [-v {none,debug,info,warning,error,critical}]
                    query_gene_set background_gene_list
@@ -160,25 +160,25 @@ usage: geneinsight [-h] [-o OUTPUT_DIR] [--no-report] [--n_samples N_SAMPLES]
 |-------------------------|--------------------------------------------------------|----------|
 | `query_gene_set`        | Path to file containing the query gene set           | Required |
 | `background_gene_list`  | Path to file containing the background gene list     | Required |
-| `-o`, `--output_dir`     | Directory to store final outputs                      | ./output |
+| `-o`, `--output-dir`     | Directory to store final outputs                      | ./output |
 | `--no-report`           | Skip generating an HTML report                         | False    |
-| `--n_samples`           | Number of topic models to run with different seeds     | 5        |
-| `--filtered_n_samples`  | Number of topic models to run from filtered gene sets  | 10       |
-| `--num_topics`          | Number of topics to extract in topic modeling          | None (auto) |
-| `--pvalue_threshold`    | Adjusted P-value threshold for filtering results       | 0.05     |
-| `--api_service`         | API service for topic refinement                       | openai   |
-| `--api_model`           | Model name for the API service                         | gpt-4o-mini |
-| `--api_parallel_jobs`   | Number of parallel API jobs                            | 1        |
-| `--api_base_url`        | Base URL for the API service                           | None     |
-| `--target_filtered_topics` | Target number of topics after filtering           | 25       |
-| `--temp_dir`            | Temporary directory for intermediate files             | None     |
-| `--report_title`        | Title for the generated report                         | None     |
+| `--n-samples`           | Number of topic models to run with different seeds     | 5        |
+| `--filtered-n-samples`  | Number of topic models to run from filtered gene sets  | 10       |
+| `--num-topics`          | Number of topics to extract in topic modeling          | None (auto) |
+| `--pvalue-threshold`    | Adjusted P-value threshold for filtering results       | 0.05     |
+| `--api-service`         | API service for topic refinement                       | openai   |
+| `--api-model`           | Model name for the API service                         | gpt-4o-mini |
+| `--api-parallel-jobs`   | Number of parallel API jobs                            | 1        |
+| `--api-base-url`        | Base URL for the API service                           | None     |
+| `--target-filtered-topics` | Target number of topics after filtering           | 25       |
+| `--temp-dir`            | Temporary directory for intermediate files             | None     |
+| `--report-title`        | Title for the generated report                         | None     |
 | `--species`             | Species identifier (NCBI taxonomy ID)                  | 9606     |
 | `--enable-ncbi-api`     | Enable NCBI API calls for gene summaries               | False    |
 | `--use-local-stringdb`  | Use local StringDB module instead of API               | False    |
 | `-v`, `--verbosity`      | Set logging verbosity                                  | none     |
-| `--api_temperature`     | Sampling temperature for API calls                     | 0.2      |
-| `--overlap_ratio_threshold` | Minimum overlap ratio threshold for filtering terms | 0.25     |
+| `--api-temperature`     | Sampling temperature for API calls                     | 0.2      |
+| `--overlap-ratio-threshold` | Minimum overlap ratio threshold for filtering terms | 0.25     |
 | `--no-metrics`          | Disable pipeline metrics collection                    | False    |
 | `--quiet-metrics`       | Suppress console display of metrics summary            | False    |
 | `--metrics-output`      | Custom path for pipeline_metrics.json output           | None     |
@@ -241,8 +241,8 @@ Geneinsight supports two API services for topic refinement:
 
 2. **Ollama API**: Local option for running models on your own hardware
    - Requires a model that supports tool use (see [supported models](https://ollama.com/search?c=tools))
-   - Requires setting the `--api_base_url` parameter, usually to `"http://localhost:11434/v1"`
-   - Example usage: `--api_service ollama --api_model llama3:8.1b --api_base_url "http://localhost:11434/v1"`
+   - Requires setting the `--api-base-url` parameter, usually to `"http://localhost:11434/v1"`
+   - Example usage: `--api-service ollama --api-model llama3:8.1b --api-base-url "http://localhost:11434/v1"`
 
 ## Environment Variables
 

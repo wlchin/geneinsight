@@ -346,7 +346,7 @@ def run_multiple_seed_topic_modeling(
     # Clean up temporary file
     try:
         os.remove(temp_file)
-    except:
+    except OSError:
         pass
     
     return final_df

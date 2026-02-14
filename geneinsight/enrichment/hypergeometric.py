@@ -115,86 +115,120 @@ def hypergeometric_enrichment(
 ) -> pd.DataFrame:
     """
     Perform hypergeometric enrichment analysis on a summary DataFrame.
-    
+
+    Note: The gene_origin_path parameter is kept for backward compatibility
+    but the genelist is now extracted from the summary DataFrame to ensure
+    consistent gene ID formats (symbols) regardless of input format (e.g.,
+    Ensembl IDs are converted to symbols by StringDB before reaching here).
+
     Args:
         df_path: Path to summary CSV file
-        gene_origin_path: Path to gene origin file
+        gene_origin_path: Path to gene origin file (kept for backward compatibility)
         background_genes_path: Path to background genes file
         output_csv: Path to output CSV file
         pvalue_threshold: P-value threshold for filtering results
-        
+
     Returns:
         DataFrame with filtered enrichment results
     """
     if not GSEAPY_AVAILABLE:
         logger.error("gseapy package not available. Please install it.")
         return pd.DataFrame()
-    
+
     logger.info("Starting hypergeometric enrichment analysis")
-    
+
     # Read input files
     try:
         df = pd.read_csv(df_path)
         logger.info(f"Read summary data with {len(df)} rows")
-        
-        gene_origin = pd.read_csv(gene_origin_path, header=None)
-        logger.info(f"Read {len(gene_origin)} genes from origin file")
-        
-        background_genes = pd.read_csv(background_genes_path, header=None)
-        logger.info(f"Read {len(background_genes)} background genes")
-        
-        background_genes_list = background_genes[0].tolist()
     except Exception as e:
-        logger.error(f"Error reading input files: {e}")
+        logger.error(f"Error reading summary file: {e}")
         return pd.DataFrame()
-    
+
     # Extract the unique genes from each topic
     try:
         # Extract minor topics with unique genes
         if "query" not in df.columns or "unique_genes" not in df.columns:
             logger.error("Required columns 'query' and 'unique_genes' not found in summary CSV")
             return pd.DataFrame()
-        
+
         minor_topics = df[["query", "unique_genes"]].drop_duplicates()
-        
+
         # Keep only the first query for each unique set of genes
         minor_topics = minor_topics.drop_duplicates(subset=["unique_genes"], keep="first")
         logger.info(f"Found {len(minor_topics)} unique gene sets")
-        
-        # Create gene query dictionary
+
+        # Create gene query dictionary AND extract all unique genes for genelist
         genequery = {}
+        all_unique_genes = set()
+
         for _, row in minor_topics.iterrows():
             query_name = row["query"]
-            
+
             try:
                 # Try to parse the unique_genes string as a dictionary and extract keys
-                geneset = list(ast.literal_eval(row["unique_genes"]).keys())
+                genes_dict = ast.literal_eval(row["unique_genes"])
+                geneset = list(genes_dict.keys())
                 if geneset:  # Only add if geneset is not empty
                     genequery[query_name] = geneset
+                    all_unique_genes.update(geneset)
             except (SyntaxError, ValueError) as e:
                 logger.warning(f"Error parsing unique_genes for query {query_name}: {e}")
                 continue
-        
+
+        # Extract unique genes from ALL rows (not just minor_topics) for complete genelist
+        for _, row in df.iterrows():
+            try:
+                genes_dict = ast.literal_eval(row["unique_genes"])
+                all_unique_genes.update(genes_dict.keys())
+            except (SyntaxError, ValueError):
+                continue
+
+        genelist = list(all_unique_genes)
+        logger.info(f"Extracted {len(genelist)} unique genes from summary for GSEA")
+
         if not genequery:
             logger.warning("No valid gene sets extracted for GSEA analysis.")
             # Create empty DataFrame with expected columns
             empty_df = pd.DataFrame(columns=["Term", "Overlap", "P-value", "Adjusted P-value", "Genes"])
-            
+
             # Save to CSV if requested
             if output_csv:
                 os.makedirs(os.path.dirname(output_csv), exist_ok=True)
                 empty_df.to_csv(output_csv, index=False)
                 logger.info(f"Saved empty results to {output_csv}")
-                
+
             return empty_df
-            
+
         logger.info(f"Created query dictionary with {len(genequery)} entries")
     except Exception as e:
         logger.error(f"Error processing gene sets: {e}")
         return pd.DataFrame()
-    
-    # Perform GSEA
-    gsea = HypergeometricGSEA(gene_origin[0].tolist(), background_list=background_genes_list)
+
+    # Read background genes (optional - may not match format)
+    background_genes_list = None
+    try:
+        background_genes = pd.read_csv(background_genes_path, header=None)
+        background_genes_list = background_genes[0].tolist()
+        logger.info(f"Read {len(background_genes_list)} background genes")
+
+        # Check if background genes match format of genelist
+        if genelist and background_genes_list:
+            sample_query = genelist[0]
+            sample_bg = background_genes_list[0]
+            # Detect format mismatch (Ensembl IDs start with ENS)
+            if sample_bg.startswith("ENS") and not sample_query.startswith("ENS"):
+                logger.warning(
+                    "Background genes appear to be Ensembl IDs but query genes are symbols. "
+                    "Using default background (all genes in gene sets)."
+                )
+                background_genes_list = None
+    except Exception as e:
+        logger.warning(f"Could not read background genes: {e}. Using default background.")
+        background_genes_list = None
+
+    # Perform GSEA using extracted genelist (gene symbols from summary)
+    gsea = HypergeometricGSEA(genelist, background_list=background_genes_list)
     result = gsea.perform_hypergeometric_gsea(genequery)
     
     # Always ensure result is a DataFrame

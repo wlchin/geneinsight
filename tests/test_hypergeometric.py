@@ -382,3 +382,202 @@ def test_hypergeometric_enrichment_file_read_exception(monkeypatch, tmp_path):
     )
 
     assert result.empty, "Should return empty DataFrame on file read error"
+
+
+# ============================================================================
+# Tests for Ensembl ID handling (gene ID format mismatch fix)
+# ============================================================================
+
+
+def test_hypergeometric_with_ensembl_ids_in_origin(monkeypatch, tmp_path):
+    """
+    Test that hypergeometric enrichment works when gene_origin contains Ensembl IDs
+    but summary contains gene symbols (the common case after StringDB conversion).
+
+    This verifies the fix for the gene ID format mismatch issue where:
+    - genelist was read from gene_origin_path (Ensembl IDs)
+    - geneset_dict was extracted from summary's unique_genes (gene symbols)
+    """
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.GSEAPY_AVAILABLE", True)
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.gp.enrich", fake_enrich_success)
+
+    # Create a summary CSV with gene symbols (as would be returned by StringDB)
+    summary_file = tmp_path / "summary.csv"
+    unique_genes_str = "{'TP53': 1, 'BRCA1': 1, 'EGFR': 1}"
+    summary_file.write_text(f"query,unique_genes\nQuery1,\"{unique_genes_str}\"\n")
+
+    # Gene origin file contains Ensembl IDs (the original user input)
+    gene_origin_file = tmp_path / "gene_origin.csv"
+    gene_origin_file.write_text("ENSG00000141510\nENSG00000012048\nENSG00000146648")
+
+    # Background file also contains Ensembl IDs
+    background_file = tmp_path / "background.csv"
+    background_file.write_text("ENSG00000141510\nENSG00000012048\nENSG00000146648\nENSG00000000003")
+
+    output_csv = tmp_path / "output.csv"
+
+    result = hypergeometric_enrichment(
+        str(summary_file),
+        str(gene_origin_file),
+        str(background_file),
+        str(output_csv),
+        pvalue_threshold=0.01
+    )
+
+    # The fix ensures genelist is extracted from summary (gene symbols)
+    # so the GSEA should work despite Ensembl IDs in gene_origin
+    assert not result.empty, "Expected non-empty results - genelist should come from summary, not gene_origin"
+    assert "Term" in result.columns
+
+
+def test_hypergeometric_with_gene_symbols_baseline(monkeypatch, tmp_path):
+    """
+    Baseline test: verify gene symbols work correctly throughout the pipeline.
+    This ensures the fix doesn't break existing functionality.
+    """
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.GSEAPY_AVAILABLE", True)
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.gp.enrich", fake_enrich_success)
+
+    # All files use gene symbols - the traditional case
+    summary_file = tmp_path / "summary.csv"
+    unique_genes_str = "{'TP53': 1, 'BRCA1': 1}"
+    summary_file.write_text(f"query,unique_genes\nQuery1,\"{unique_genes_str}\"\n")
+
+    gene_origin_file = tmp_path / "gene_origin.csv"
+    gene_origin_file.write_text("TP53\nBRCA1")
+
+    background_file = tmp_path / "background.csv"
+    background_file.write_text("TP53\nBRCA1\nEGFR\nMYC")
+
+    output_csv = tmp_path / "output.csv"
+
+    result = hypergeometric_enrichment(
+        str(summary_file),
+        str(gene_origin_file),
+        str(background_file),
+        str(output_csv),
+        pvalue_threshold=0.01
+    )
+
+    assert not result.empty, "Gene symbols should work correctly"
+    assert "Term" in result.columns
+
+
+def test_extract_genes_from_summary_multiple_rows(monkeypatch, tmp_path):
+    """
+    Test that genes are correctly extracted from multiple rows in the summary.
+    This ensures all unique genes across all topics are collected.
+    """
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.GSEAPY_AVAILABLE", True)
+
+    # Track what genelist is passed to gp.enrich
+    captured_genelist = []
+
+    def fake_enrich_capture(gene_list, gene_sets, background, outdir, verbose):
+        captured_genelist.extend(gene_list)
+        return FakeEnr(pd.DataFrame({
+            "Term": ["Set1"],
+            "Overlap": ["1/100"],
+            "P-value": [0.005],
+            "Adjusted P-value": [0.005],
+            "Genes": ["gene1"]
+        }))
+
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.gp.enrich", fake_enrich_capture)
+
+    # Create summary with multiple rows containing different gene sets
+    summary_file = tmp_path / "summary.csv"
+    summary_file.write_text(
+        'query,unique_genes\n'
+        'Query1,"{\'TP53\': 1, \'BRCA1\': 1}"\n'
+        'Query2,"{\'EGFR\': 1, \'MYC\': 1}"\n'
+        'Query3,"{\'TP53\': 1, \'KRAS\': 1}"\n'  # TP53 is duplicated
+    )
+
+    gene_origin_file = tmp_path / "gene_origin.csv"
+    gene_origin_file.write_text("ENSG00000141510")  # Ensembl ID - should be ignored
+
+    background_file = tmp_path / "background.csv"
+    background_file.write_text("TP53\nBRCA1")  # Gene symbols
+
+    output_csv = tmp_path / "output.csv"
+
+    result = hypergeometric_enrichment(
+        str(summary_file),
+        str(gene_origin_file),
+        str(background_file),
+        str(output_csv)
+    )
+
+    # Check that all unique genes from summary were extracted
+    expected_genes = {"TP53", "BRCA1", "EGFR", "MYC", "KRAS"}
+    assert set(captured_genelist) == expected_genes, f"Expected {expected_genes}, got {set(captured_genelist)}"
+
+
+def test_background_genes_format_mismatch_warning(monkeypatch, tmp_path, caplog):
+    """
+    Test that a warning is logged when background genes are Ensembl IDs
+    but query genes are symbols.
+    """
+    import logging
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.GSEAPY_AVAILABLE", True)
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.gp.enrich", fake_enrich_success)
+
+    summary_file = tmp_path / "summary.csv"
+    unique_genes_str = "{'TP53': 1, 'BRCA1': 1}"
+    summary_file.write_text(f"query,unique_genes\nQuery1,\"{unique_genes_str}\"\n")
+
+    gene_origin_file = tmp_path / "gene_origin.csv"
+    gene_origin_file.write_text("ENSG00000141510")
+
+    # Background file contains Ensembl IDs while summary has gene symbols
+    background_file = tmp_path / "background.csv"
+    background_file.write_text("ENSG00000141510\nENSG00000012048")
+
+    output_csv = tmp_path / "output.csv"
+
+    with caplog.at_level(logging.WARNING):
+        result = hypergeometric_enrichment(
+            str(summary_file),
+            str(gene_origin_file),
+            str(background_file),
+            str(output_csv)
+        )
+
+    # Check that warning about format mismatch was logged
+    assert any("Ensembl IDs" in record.message for record in caplog.records), \
+        "Expected warning about Ensembl ID format mismatch"
+
+
+def test_background_genes_file_missing(monkeypatch, tmp_path, caplog):
+    """
+    Test that hypergeometric enrichment works even when background file is missing.
+    Should fall back to default background.
+    """
+    import logging
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.GSEAPY_AVAILABLE", True)
+    monkeypatch.setattr("geneinsight.enrichment.hypergeometric.gp.enrich", fake_enrich_success)
+
+    summary_file = tmp_path / "summary.csv"
+    unique_genes_str = "{'TP53': 1, 'BRCA1': 1}"
+    summary_file.write_text(f"query,unique_genes\nQuery1,\"{unique_genes_str}\"\n")
+
+    gene_origin_file = tmp_path / "gene_origin.csv"
+    gene_origin_file.write_text("TP53\nBRCA1")
+
+    # Background file does not exist
+    nonexistent_background = tmp_path / "nonexistent_background.csv"
+
+    output_csv = tmp_path / "output.csv"
+
+    with caplog.at_level(logging.WARNING):
+        result = hypergeometric_enrichment(
+            str(summary_file),
+            str(gene_origin_file),
+            str(nonexistent_background),
+            str(output_csv)
+        )
+
+    # Should still produce results using default background
+    assert not result.empty, "Should work with default background when file is missing"
+    assert any("Could not read background" in record.message for record in caplog.records)

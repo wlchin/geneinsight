@@ -28,7 +28,10 @@ def merge_context_ontology(subheadings_path, ontology_dict_path, output_path):
         
         # Merge on 'query' column
         merged_df = pd.merge(subheadings_df, ontology_df, on="query", how="inner")
-        
+
+        if merged_df.empty:
+            logging.warning("Merge resulted in empty DataFrame. No matching 'query' values found.")
+
         # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         

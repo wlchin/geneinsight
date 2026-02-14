@@ -134,7 +134,10 @@ def generate_rst_files(headings_path, merged_path, filtered_sets_path, output_di
                     if 'subtitle' in section:
                         code_dict = {}
                         if section.get('code_block'):
-                            code_dict = ast.literal_eval(section['code_block'])
+                            try:
+                                code_dict = ast.literal_eval(section['code_block'])
+                            except (SyntaxError, ValueError):
+                                code_dict = {}
                         subtitlestr = section['subtitle']
                         filtered_row = filtered_genesets_df[filtered_genesets_df['Term'] == subtitlestr]
                         if not filtered_row.empty:

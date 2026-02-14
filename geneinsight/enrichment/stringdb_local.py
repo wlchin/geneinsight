@@ -32,7 +32,13 @@ def read_gene_list(input_file: str) -> List[str]:
         
         # Get the gene list from the first column
         gene_list = df.iloc[:, 0].tolist()
-        
+
+        # Filter out NaN and empty strings
+        gene_list = [
+            gene for gene in gene_list
+            if pd.notna(gene) and str(gene).strip()
+        ]
+
         # Remove duplicates while preserving order
         seen = set()
         unique_genes = []
@@ -75,7 +81,7 @@ def load_species_data(species: int) -> pd.DataFrame:
             logger.info(f"Local file {local_path} not found. Downloading...")
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
             url = f"https://raw.githubusercontent.com/wlchin/string_db_enrichment_cache/main/{species}/{pkl_name}"
-            response = requests.get(url)
+            response = requests.get(url, timeout=60)
             response.raise_for_status()
             with open(local_path, "wb") as f:
                 f.write(response.content)
@@ -108,13 +114,17 @@ def process_gene_enrichment(
 
     genes = read_gene_list(input_file)
     if not species_df.empty:
-        example_gene = str(species_df["gene_name"].dropna().iloc[0])
-        if example_gene.isupper():
-            genes = [g.upper() for g in genes]
-        elif example_gene.islower():
-            genes = [g.lower() for g in genes]
-        elif example_gene.istitle():
-            genes = [g.title() for g in genes]
+        gene_name_series = species_df["gene_name"].dropna()
+        if gene_name_series.empty:
+            logger.warning("No gene names available in species data after dropping NaN.")
+        else:
+            example_gene = str(gene_name_series.iloc[0])
+            if example_gene.isupper():
+                genes = [g.upper() for g in genes]
+            elif example_gene.islower():
+                genes = [g.lower() for g in genes]
+            elif example_gene.istitle():
+                genes = [g.title() for g in genes]
     else:
         logger.warning("Species data is empty. Check PKL files or species argument.")
 

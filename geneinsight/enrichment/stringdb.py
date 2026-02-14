@@ -35,7 +35,13 @@ def read_gene_list(input_file: str) -> List[str]:
         
         # Get the gene list from the first column
         gene_list = df.iloc[:, 0].tolist()
-        
+
+        # Filter out NaN and empty strings
+        gene_list = [
+            gene for gene in gene_list
+            if pd.notna(gene) and str(gene).strip()
+        ]
+
         # Remove duplicates while preserving order
         seen = set()
         unique_genes = []
@@ -90,7 +96,7 @@ def map_gene_identifiers(gene_list: List[str], species: int = 9606) -> Dict[str,
     
     try:
         # Call STRING API
-        results = requests.post(request_url, data=params)
+        results = requests.post(request_url, data=params, timeout=30)
         results.raise_for_status()  # Check for HTTP errors
         
         # Parse the results

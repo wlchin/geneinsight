@@ -9,6 +9,9 @@ def main(ontology_dict_csv, subheadings_csv, output_csv):
     # Merge the DataFrames on the "query" column
     merged_df = pd.merge(subheadings_df, ontology_dict_df, on="query", how="inner")
 
+    if merged_df.empty:
+        print("Warning: Merge resulted in empty DataFrame. No matching 'query' values found.")
+
     # Save the merged DataFrame to the output CSV file
     merged_df.to_csv(output_csv, index=False)
     print(merged_df)

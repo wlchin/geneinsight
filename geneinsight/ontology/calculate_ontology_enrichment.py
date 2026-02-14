@@ -442,13 +442,17 @@ def main():
     logger.info(f"Processing {df.shape[0]} rows from the summary CSV.")
     for index, row in df.iterrows():
         query = row["query"]
-        unique_genes = list(ast.literal_eval(row["unique_genes"]).keys())
+        try:
+            unique_genes = list(ast.literal_eval(row["unique_genes"]).keys())
+        except (SyntaxError, ValueError) as e:
+            logger.warning(f"Failed to parse unique_genes for query '{query}': {e}. Skipping.")
+            continue
 
         (
-            top_results_indices, 
-            extracted_items, 
-            enrichr_results, 
-            enrichr_df_filtered, 
+            top_results_indices,
+            extracted_items,
+            enrichr_results,
+            enrichr_df_filtered,
             formatted_output
         ) = rag_module.get_top_documents(
             query=query,

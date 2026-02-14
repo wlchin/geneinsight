@@ -96,7 +96,7 @@ def get_gene_summary(gene_name: str, taxonomy_id: str = "9606") -> Tuple[Optiona
         "retmode": "json"
     }
     
-    response = requests.get(search_url, params=params).json()
+    response = requests.get(search_url, params=params, timeout=10).json()
     gene_ids = response.get("esearchresult", {}).get("idlist", [])
     
     if not gene_ids:
@@ -112,7 +112,7 @@ def get_gene_summary(gene_name: str, taxonomy_id: str = "9606") -> Tuple[Optiona
         "retmode": "json"
     }
 
-    summary_response = requests.get(summary_url, params=params).json()
+    summary_response = requests.get(summary_url, params=params, timeout=10).json()
     gene_info = summary_response.get("result", {}).get(gene_id, {})
 
     summary_text = gene_info.get("summary", "No summary available")
@@ -146,8 +146,14 @@ def create_clustered_sections(
         for row in reader:
             cluster = int(row['Cluster'])
             # Parse references and ontology (thematic_geneset)
-            ref_dict = ast.literal_eval(row.get('ref_dict', '{}'))
-            ontology_dict = ast.literal_eval(row.get('ontology_dict', '{}'))
+            try:
+                ref_dict = ast.literal_eval(row.get('ref_dict', '{}'))
+            except (SyntaxError, ValueError):
+                ref_dict = {}
+            try:
+                ontology_dict = ast.literal_eval(row.get('ontology_dict', '{}'))
+            except (SyntaxError, ValueError):
+                ontology_dict = {}
             # Generate the image filename from the 'query' column
             image_filename = row['query'].replace(' ', '_').replace('/', '_') + '.png'
             toggle_content = (
@@ -224,7 +230,10 @@ def generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api, t
             # Add code block or references
             if section.get('code_block'):
                 f.write(".. admonition:: Key information\n\n")
-                code_dict = ast.literal_eval(section['code_block'])
+                try:
+                    code_dict = ast.literal_eval(section['code_block'])
+                except (SyntaxError, ValueError):
+                    code_dict = {}
                 code_items = sorted(code_dict.items(), key=lambda x: x[1], reverse=True)
                 top_5 = code_items[:5]
                 top_5_keys = []
@@ -378,7 +387,10 @@ def main():
                 if 'subtitle' in section:
                     code_dict = {}
                     if section.get('code_block'):
-                        code_dict = ast.literal_eval(section['code_block'])
+                        try:
+                            code_dict = ast.literal_eval(section['code_block'])
+                        except (SyntaxError, ValueError):
+                            code_dict = {}
                     subtitlestr = section['subtitle']
                     filtered_row = filtered_genesets_df[filtered_genesets_df['Term'] == subtitlestr]
                     if not filtered_row.empty:

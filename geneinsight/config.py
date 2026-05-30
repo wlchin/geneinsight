@@ -21,6 +21,9 @@ DEFAULT_CONFIG = {
     "api_parallel_jobs": 50,
     "api_base_url": None,
     "target_filtered_topics": 25,
+    "empirical_p": False,
+    "empirical_p_statistic": "raw",
+    "null_cache": None,
 }
 
 def load_config(config_path: str) -> Dict[str, Any]:
@@ -114,23 +117,28 @@ def load_from_env(prefix: str = "TOPICGENES_") -> Dict[str, Any]:
         f"{prefix}API_PARALLEL_JOBS": "api_parallel_jobs",
         f"{prefix}API_BASE_URL": "api_base_url",
         f"{prefix}TARGET_FILTERED_TOPICS": "target_filtered_topics",
+        f"{prefix}EMPIRICAL_P": "empirical_p",
+        f"{prefix}EMPIRICAL_P_STATISTIC": "empirical_p_statistic",
+        f"{prefix}NULL_CACHE": "null_cache",
     }
-    
+
     # Get values from environment
     for env_var, config_key in env_mappings.items():
         if env_var in os.environ:
             value = os.environ[env_var]
-            
+
             # Try to convert numeric values
             try:
                 if config_key in ["n_samples", "num_topics", "api_parallel_jobs", "target_filtered_topics"]:
                     value = int(value)
                 elif config_key == "pvalue_threshold":
                     value = float(value)
+                elif config_key == "empirical_p":
+                    value = str(value).lower() in {"1", "true", "yes", "on"}
             except ValueError:
                 logger.warning(f"Invalid value for {env_var}: {value}")
                 continue
-                
+
             config[config_key] = value
     
     return config

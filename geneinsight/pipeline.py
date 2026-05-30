@@ -48,6 +48,10 @@ class Pipeline:
         call_ncbi_api: bool = True,     # whether to call NCBI API for gene summaries
         use_local_stringdb: bool = True,  # whether to use local StringDB module instead of API (default now True)
         overlap_ratio_threshold: float = 0.25,  # minimum overlap ratio to keep terms after hypergeometric enrichment
+        # Empirical p-value options
+        empirical_p: bool = False,        # annotate enriched.csv with empirical p / q from a null pool
+        empirical_p_statistic: str = "raw",  # 'raw' (hypergeometric P) or 'overlap' (k/m)
+        null_cache: Optional[str] = None,    # path to a custom NullPool dir; None = bundled default
         # Metrics/instrumentation options
         enable_metrics: bool = True,      # whether to collect timing and token metrics
         quiet_metrics: bool = False,      # suppress console metrics summary
@@ -84,6 +88,12 @@ class Pipeline:
         self.call_ncbi_api = call_ncbi_api  # store NCBI API control parameter
         self.use_local_stringdb = use_local_stringdb  # store local StringDB option
         self.overlap_ratio_threshold = overlap_ratio_threshold  # store overlap ratio threshold
+
+        # Empirical p-value options
+        self.empirical_p = empirical_p
+        self.empirical_p_statistic = empirical_p_statistic
+        self.null_cache = null_cache
+        self._null_pool = None  # lazy-loaded the first time we need it
 
         # Metrics options
         self.enable_metrics = enable_metrics
@@ -262,6 +272,13 @@ class Pipeline:
                 self.console.print(f"Number of enriched gene sets: {len(enriched_df)}")
             self.console.print("[bold green]Done! Step 6 completed.[/bold green]")
 
+            # Step 6a: Empirical p-value annotation (optional)
+            if self.empirical_p:
+                self.console.rule("[bold cyan]Step 6a: Empirical p-value recalibration[/bold cyan]")
+                with self._time_stage("Step 6a: Empirical P-value"):
+                    enriched_df = self._annotate_empirical_p(enriched_df, query_gene_set)
+                self.console.print("[bold green]Done! Step 6a completed.[/bold green]")
+
             # Step 6b: Filter by overlap ratio
             self.console.rule("[bold cyan]Step 6b: Filtering by overlap ratio[/bold cyan]")
             with self._time_stage("Step 6b: Overlap Ratio Filter"):
@@ -356,6 +373,20 @@ class Pipeline:
                         logger.warning("Report generation failed or was skipped")
                 self.console.print("[bold green]Done! Step 11 completed.[/bold green]")
 
+            # Finalize and persist metrics BEFORE Step 12 zips and deletes output_path.
+            # Writing pipeline_metrics.json to output_path AFTER zip+delete recreates the
+            # directory with one file and breaks the runner's zip-extraction fallback in
+            # workflows/gobp_pipeline/scripts/run_geneinsight.py (run_pipeline_for_sample).
+            # See plan docs/superpowers/plans/2026-04-27-pipeline-metrics-save-order-fix.md.
+            metrics = None
+            if self.metrics_collector:
+                metrics = self.metrics_collector.finalize()
+                if self.metrics_output_path:
+                    metrics_path = self.metrics_output_path
+                else:
+                    metrics_path = os.path.join(output_path, "pipeline_metrics.json")
+                self.metrics_collector.save(metrics_path)
+
             # Step 12: Reorganize output directory
             self.console.rule("[bold cyan]Step 12: Reorganizing output directory[/bold cyan]")
             with self._time_stage("Step 12: Reorganize Output"):
@@ -363,23 +394,12 @@ class Pipeline:
                     self._reorganize_output_directory(output_path)
             self.console.print("[bold green]Done! Step 12 completed.[/bold green]")
 
-            # Finalize and display metrics
-            if self.metrics_collector:
-                metrics = self.metrics_collector.finalize()
-
-                # Save metrics to JSON file
-                if self.metrics_output_path:
-                    metrics_path = self.metrics_output_path
-                else:
-                    metrics_path = os.path.join(output_path, "pipeline_metrics.json")
-                self.metrics_collector.save(metrics_path)
-
-                # Display metrics summary (unless quiet mode)
-                if not self.quiet_metrics:
-                    self.console.print("")
-                    self.console.rule("[bold magenta]Pipeline Metrics Summary[/bold magenta]")
-                    summary = format_metrics_summary(metrics)
-                    self.console.print(summary)
+            # Display metrics summary (unless quiet mode) — metrics already saved above
+            if self.metrics_collector and not self.quiet_metrics:
+                self.console.print("")
+                self.console.rule("[bold magenta]Pipeline Metrics Summary[/bold magenta]")
+                summary = format_metrics_summary(metrics)
+                self.console.print(summary)
 
             self.console.print("[bold green]Pipeline completed successfully![/bold green]")
             self.console.print(f"Results available at: [bold]{output_path + '.zip'}[/bold]")
@@ -607,6 +627,96 @@ class Pipeline:
         """Filter enriched terms by overlap ratio."""
         from .enrichment.hypergeometric import filter_by_overlap_ratio
         return filter_by_overlap_ratio(df, threshold=self.overlap_ratio_threshold)
+
+    def _load_null_pool(self):
+        """Lazy-load and cache the NullPool for this Pipeline instance."""
+        if self._null_pool is not None:
+            return self._null_pool
+        from .calibration import NullPool
+        statistic = self.empirical_p_statistic
+        if self.null_cache:
+            self._null_pool = NullPool.from_path(self.null_cache, statistic=statistic)
+        else:
+            self._null_pool = NullPool.from_bundled(statistic=statistic)
+        self.console.print(
+            f"Loaded null pool ({statistic}): "
+            f"{self._null_pool.total_themes()} themes across "
+            f"{len(self._null_pool.bin_counts())} bins from {self._null_pool.source}"
+        )
+        return self._null_pool
+
+    def _annotate_empirical_p(
+        self, enriched_df: pd.DataFrame, query_gene_set: str
+    ) -> pd.DataFrame:
+        """Annotate enriched_df with p_empirical / q_empirical columns.
+
+        Also re-writes `enriched_unfiltered.csv` (if present) with the same
+        columns appended, so the full pre-filter distribution carries the
+        recalibration for downstream analysis.
+        """
+        from .calibration import annotate_enriched
+
+        # Count unique non-empty genes in the query file (matches load_background dedup).
+        seen = set()
+        n_query = 0
+        try:
+            with open(query_gene_set, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    g = line.strip()
+                    if g and g not in seen:
+                        seen.add(g)
+                        n_query += 1
+        except OSError as exc:
+            logger.warning("Could not read query gene set for empirical-p: %s", exc)
+            return enriched_df
+
+        if n_query == 0:
+            logger.warning("Query gene set is empty; skipping empirical-p.")
+            return enriched_df
+
+        try:
+            null_pool = self._load_null_pool()
+        except Exception as exc:  # noqa: BLE001 — recalibration is optional, don't fail the run
+            logger.error("Failed to load null pool for empirical-p: %s", exc)
+            self.console.print(f"[yellow]Empirical-p skipped (null pool error): {exc}[/yellow]")
+            return enriched_df
+
+        # Annotate the filtered enriched_df returned by Step 6.
+        annotated_df = annotate_enriched(
+            enriched_df,
+            gene_count=n_query,
+            null_pool=null_pool,
+            statistic=self.empirical_p_statistic,
+        )
+
+        # Also annotate the unfiltered CSV (calibration analyses need the full distribution).
+        unfiltered_path = os.path.join(self.dirs["filtered_sets"], "enriched_unfiltered.csv")
+        if os.path.exists(unfiltered_path):
+            try:
+                unfiltered_df = pd.read_csv(unfiltered_path)
+                unfiltered_annotated = annotate_enriched(
+                    unfiltered_df,
+                    gene_count=n_query,
+                    null_pool=null_pool,
+                    statistic=self.empirical_p_statistic,
+                )
+                unfiltered_annotated.to_csv(unfiltered_path, index=False)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to annotate enriched_unfiltered.csv: %s", exc)
+
+        # Write the annotated filtered table back to its on-disk location.
+        enriched_path = os.path.join(self.dirs["filtered_sets"], "enriched.csv")
+        try:
+            annotated_df.to_csv(enriched_path, index=False)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to write annotated enriched.csv: %s", exc)
+
+        n_pass = int((annotated_df["q_empirical"] < 0.05).sum())
+        self.console.print(
+            f"Empirical-p ({self.empirical_p_statistic}): query_size={n_query} "
+            f"-> {n_pass}/{len(annotated_df)} terms pass q_empirical < 0.05"
+        )
+        return annotated_df
 
     def _run_topic_modeling_on_filtered_sets(self, filtered_df: pd.DataFrame) -> pd.DataFrame:
         """Run topic modeling on the filtered gene sets (meta-analysis)."""

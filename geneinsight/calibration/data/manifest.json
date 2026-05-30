@@ -1,0 +1,36 @@
+{
+  "kind": "bundled-default",
+  "version": "0.1.0",
+  "built_at": "2026-05-16",
+  "source_repository": "https://github.com/wlchin/geneinsight",
+  "background": {
+    "name": "STRING_human_v12",
+    "path_in_source_repo": "geneinsight/workflows/gobp_sampling/background.txt",
+    "n_genes": 10857
+  },
+  "pipeline_version": "0.1.0",
+  "n_themes": 71925,
+  "n_random_runs": 55,
+  "bins": [
+    "1-50", "51-100", "101-150", "151-200", "201-250",
+    "251-300", "301-350", "351-400", "401-450", "451-500"
+  ],
+  "bin_counts": {
+    "1-50": 12430,
+    "51-100": 17184,
+    "101-150": 2823,
+    "151-200": 4892,
+    "201-250": 5554,
+    "251-300": 3164,
+    "301-350": 3390,
+    "351-400": 8201,
+    "401-450": 4619,
+    "451-500": 9668
+  },
+  "statistics_available": ["raw", "overlap"],
+  "ks_distance_vs_uniform_loo": {
+    "raw": 0.010,
+    "overlap": 0.067
+  },
+  "notes": "Built from 55 random pipeline runs across batches 1-9 plus topup_random. Stratified into 10 query-size bins covering 1-500 genes. Conditional on the STRING_human_v12 background; rebuild via `geneinsight build-null` if you use a different background or organism."
+}

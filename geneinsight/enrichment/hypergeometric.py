@@ -242,11 +242,21 @@ def hypergeometric_enrichment(
         if len(result.columns) == 0:
             result = pd.DataFrame(columns=["Term", "Overlap", "P-value", "Adjusted P-value", "Genes"])
     else:
+        # Save the unfiltered result (full p-value distribution) for calibration analysis
+        if output_csv:
+            try:
+                unfiltered_csv = os.path.join(os.path.dirname(output_csv), "enriched_unfiltered.csv")
+                os.makedirs(os.path.dirname(unfiltered_csv), exist_ok=True)
+                result.to_csv(unfiltered_csv, index=False)
+                logger.info(f"Saved unfiltered results ({len(result)} rows) to {unfiltered_csv}")
+            except Exception as e:
+                logger.error(f"Error saving unfiltered results: {e}")
+
         # Filter for significant results
         filtered_result = result[result["Adjusted P-value"] < pvalue_threshold]
         logger.info(f"Filtered to {len(filtered_result)} significant results (p < {pvalue_threshold})")
         result = filtered_result
-    
+
     # Save to CSV
     if output_csv:
         try:
@@ -255,7 +265,7 @@ def hypergeometric_enrichment(
             logger.info(f"Saved results to {output_csv}")
         except Exception as e:
             logger.error(f"Error saving results: {e}")
-    
+
     return result
 
 

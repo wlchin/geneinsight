@@ -53,6 +53,9 @@ class TestGeneInsightCLI:
             'call_ncbi_api': False,  # Added new parameter
             'use_local_stringdb': False,  # Added new parameter
             'overlap_ratio_threshold': 0.25,  # Added new parameter
+            'empirical_p': False,
+            'empirical_p_statistic': 'raw',
+            'null_cache': None,
             'enable_metrics': True,  # Added new parameter
             'quiet_metrics': False,  # Added new parameter
             'metrics_output_path': None  # Added new parameter
@@ -122,6 +125,9 @@ class TestGeneInsightCLI:
             'call_ncbi_api': False,  # Added new parameter (default)
             'use_local_stringdb': False,  # Added new parameter (default)
             'overlap_ratio_threshold': 0.25,  # Added new parameter (default)
+            'empirical_p': False,
+            'empirical_p_statistic': 'raw',
+            'null_cache': None,
             'enable_metrics': True,  # Added new parameter (default)
             'quiet_metrics': False,  # Added new parameter (default)
             'metrics_output_path': None  # Added new parameter (default)

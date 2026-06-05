@@ -28,6 +28,9 @@ def sample_config():
         "api_parallel_jobs": 8,
         "api_base_url": "https://api.example.com",
         "target_filtered_topics": 30,
+        "empirical_p": False,
+        "empirical_p_statistic": "raw",
+        "null_cache": None,
     }
 
 

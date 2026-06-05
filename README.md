@@ -42,6 +42,7 @@ The documentation includes detailed API references, examples, and advanced usage
 - [API Support](#api-support)
 - [Environment Variables](#environment-variables)
 - [Output Format](#output-format)
+- [Empirical p-value Recalibration](#empirical-p-value-recalibration)
 - [Pipeline Metrics](#pipeline-metrics)
 - [Interactive Report](#interactive-report)
 - [Examples](#examples)
@@ -279,6 +280,24 @@ The pipeline produces a directory (which can be optionally zipped) containing:
 - `filtered.csv`: Final filtered topics
 - `metadata.csv`: Run information and parameters
 - `pipeline_metrics.json`: Timing and token usage metrics (unless disabled with `--no-metrics`)
+
+## Empirical p-value Recalibration
+
+GeneInsight provides an empirical recalibration of Step 6 *p*-values. To enable, pass `--empirical-p` to the CLI or set `empirical_p: true` in your config. Each topic in `enriched.csv` will receive a `p_empirical` column and a BH-adjusted `q_empirical` column.
+
+Two test statistics are available:
+
+- `--empirical-p-statistic raw` (default) — recalibrates the hypergeometric *P*-value.
+- `--empirical-p-statistic overlap` — recalibrates the topic / query overlap ratio.
+
+Self-test the calibration with `geneinsight validate-null` (reports per-size-bin leave-one-out KS distance against Uniform(0,1)).
+
+Users with custom backgrounds or non-default pipeline configurations can build a matched null pool with:
+
+```bash
+geneinsight build-null --query-size N --replicates K \
+                       --background path.txt --output-cache dir/
+```
 
 ## Pipeline Metrics
 

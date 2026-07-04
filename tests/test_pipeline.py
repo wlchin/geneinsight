@@ -991,18 +991,19 @@ class TestPipelineReportGeneration:
                 assert result is None
 
     def test_report_generation_returns_false(self, pipeline, mock_files):
-        """Test handling when report pipeline returns (False, None)."""
+        """If report.pipeline.run_pipeline returns (False, None) without raising,
+        _generate_report must raise RuntimeError. This is an internal contract
+        violation — run_pipeline is now expected to raise on any failure."""
         output_path = os.path.join(pipeline.dirs["final"], "test_run")
         os.makedirs(output_path, exist_ok=True)
 
         with patch("geneinsight.report.pipeline.run_pipeline", return_value=(False, None)):
-            result = pipeline._generate_report(
-                output_path=output_path,
-                query_gene_set=mock_files["query"],
-                report_title="Test Report"
-            )
-
-            assert result is None
+            with pytest.raises(RuntimeError, match="contract violation"):
+                pipeline._generate_report(
+                    output_path=output_path,
+                    query_gene_set=mock_files["query"],
+                    report_title="Test Report"
+                )
 
 
 class TestPipelineInstrumentation:

@@ -188,7 +188,7 @@ def run_pipeline(
         )
         
         # Step 6: Build Sphinx documentation
-        build_sphinx_docs(
+        sphinx_ok = build_sphinx_docs(
             rst_folder=paths["rst_folder"],
             image_folder=os.path.join(output_folder, f"results/heatmaps/{gene_set}"),
             output_folder=paths["sphinx_build"],
@@ -196,6 +196,11 @@ def run_pipeline(
             html_embedding_path=paths["circle_plot"],
             logo_path=logo_path
         )
+        if not sphinx_ok:
+            raise RuntimeError(
+                f"Sphinx build failed for gene_set={gene_set!r}; "
+                f"see log at {paths['sphinx_log']}"
+            )
         
         # Calculate total time
         end_time = time.time()
@@ -204,13 +209,19 @@ def run_pipeline(
         
         # Output final location
         html_index = os.path.join(paths["sphinx_build"], "build", "html", "index.html")
-        if os.path.exists(html_index):
-            logging.info(f"Success! The Sphinx documentation is available at: {html_index}")
-            return True, html_index
-        else:
-            logging.warning(f"Sphinx build may have had issues. Check {paths['sphinx_log']} for details.")
-            return False, None
+        if not os.path.exists(html_index):
+            raise RuntimeError(
+                f"Sphinx build reported success but no index.html at {html_index}; "
+                f"see log at {paths['sphinx_log']}"
+            )
+        logging.info(f"Success! The Sphinx documentation is available at: {html_index}")
+        return True, html_index
         
+    except RuntimeError:
+        # Surface Sphinx-build (and other explicit) failures to the caller
+        # instead of silently returning (False, str(e)).
+        logging.error("Pipeline execution error", exc_info=True)
+        raise
     except Exception as e:
         logging.error(f"Pipeline execution error: {str(e)}", exc_info=True)
         return False, str(e)

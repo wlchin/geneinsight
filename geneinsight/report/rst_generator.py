@@ -12,7 +12,6 @@ import base64
 import re
 import ast
 import shutil
-import random
 import csv
 import time  # Added for time-based throttling
 from .generate_rst_from_files import create_clustered_sections, generate_rst_file, clear_csv_folder
@@ -71,98 +70,113 @@ def generate_rst_files(headings_path, merged_path, filtered_sets_path, output_di
     throttling_msg = "with 1-second throttling" if call_ncbi_api else "without throttling"
     logging.info(f"Starting RST file generation. Taxonomy ID: {taxonomy_id}, NCBI API calls: {throttling_msg}")
 
-    try:
-        # Ensure output directories exist
-        os.makedirs(output_dir, exist_ok=True)
-        os.makedirs(csv_folder, exist_ok=True)
-        
-        # Clear any existing CSV files in the csv_folder
-        clear_csv_folder(csv_folder)
-        
-        # Create clustered sections using the imported function
-        clustered_sections = create_clustered_sections(headings_path, merged_path)
-        
-        # Read filtered gene sets CSV into a DataFrame
-        filtered_genesets_df = pd.read_csv(filtered_sets_path)
-        
-        # Iterate over clusters and generate the corresponding RST files
-        for cluster_id, sections in clustered_sections.items():
-            rst_filename = os.path.join(output_dir, f"cluster_{cluster_id}.rst")
-            
-            # Use throttled version if making API calls
-            if call_ncbi_api:
-                throttled_generate_rst_file(
-                    filename=rst_filename, 
-                    sections=sections, 
-                    filtered_genesets_df=filtered_genesets_df, 
-                    call_ncbi_api=call_ncbi_api,
-                    taxonomy_id=taxonomy_id
-                )
-            else:
-                # Otherwise use the original function
-                generate_rst_file(
-                    filename=rst_filename, 
-                    sections=sections, 
-                    filtered_genesets_df=filtered_genesets_df, 
-                    call_ncbi_api=False,
-                    taxonomy_id=taxonomy_id
-                )
-            
-            # Log additional information
-            num_references = sum(len(section.get('references', [])) for section in sections)
-            num_thematic_genesets = sum(len(section.get('thematic_geneset', [])) for section in sections)
-            logging.info(
-                f"Wrote {rst_filename} with {len(sections)} section(s), "
-                f"{num_references} references, and {num_thematic_genesets} thematic genesets."
+    # Ensure output directories exist
+    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(csv_folder, exist_ok=True)
+
+    # Clear any existing CSV files in the csv_folder
+    clear_csv_folder(csv_folder)
+
+    # Create clustered sections using the imported function
+    clustered_sections = create_clustered_sections(headings_path, merged_path)
+
+    # Read filtered gene sets CSV into a DataFrame
+    filtered_genesets_df = pd.read_csv(filtered_sets_path)
+
+    # Invariant check: every subtitle that will be written must resolve to a
+    # Term in filtered_genesets_df. clustered.Term is built from enriched.csv
+    # upstream (pipeline.py: _filter_topics -> _run_clustering); if this set
+    # difference is non-empty, an upstream refactor has broken the invariant
+    # and random fake statistics would silently end up in reviewer outputs.
+    all_subtitles = {
+        section['subtitle']
+        for sections in clustered_sections.values()
+        for section in sections
+        if 'subtitle' in section
+    }
+    known_terms = set(filtered_genesets_df['Term'])
+    missing = all_subtitles - known_terms
+    assert not missing, (
+        "clustered.Term must be a subset of enriched.Term but the following "
+        f"subtitles are missing from filtered_genesets_df: {sorted(missing)[:5]}"
+        + (f" (and {len(missing)-5} more)" if len(missing) > 5 else "")
+    )
+
+    # Iterate over clusters and generate the corresponding RST files
+    for cluster_id, sections in clustered_sections.items():
+        rst_filename = os.path.join(output_dir, f"cluster_{cluster_id}.rst")
+
+        # Use throttled version if making API calls
+        if call_ncbi_api:
+            throttled_generate_rst_file(
+                filename=rst_filename,
+                sections=sections,
+                filtered_genesets_df=filtered_genesets_df,
+                call_ncbi_api=call_ncbi_api,
+                taxonomy_id=taxonomy_id
             )
-            
-            # Generate CSV for each cluster similar to the original script
-            theme_title = sections[0].get('title', f"Theme {cluster_id+1}") if sections else f"Theme {cluster_id+1}"
-            m = re.match(r"Theme (\d+)\s*-\s*(.+)", theme_title)
-            if m:
-                theme_num, heading_str = m.groups()
-            else:
-                theme_num, heading_str = str(cluster_id+1), theme_title
-            sanitized_title = heading_str.replace(" ", "_")
-            csv_filename = os.path.join(csv_folder, f"Theme_{theme_num}_{sanitized_title}.csv")
-            
-            with open(csv_filename, 'w', newline='', encoding='utf-8') as csvfile:
-                fieldnames = ["subtitle", "odds_ratio", "p-value", "fdr", "combined_score", "gene_set"]
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writeheader()
-                for section in sections:
-                    if 'subtitle' in section:
-                        code_dict = {}
-                        if section.get('code_block'):
-                            try:
-                                code_dict = ast.literal_eval(section['code_block'])
-                            except (SyntaxError, ValueError):
-                                code_dict = {}
-                        subtitlestr = section['subtitle']
-                        filtered_row = filtered_genesets_df[filtered_genesets_df['Term'] == subtitlestr]
-                        if not filtered_row.empty:
-                            odds_ratio = filtered_row['Odds Ratio'].values[0]
-                            p_value = filtered_row['Adjusted P-value'].values[0]
-                            combined_score = filtered_row['Combined Score'].values[0]
-                            p_val = filtered_row['P-value'].values[0]
-                        else:
-                            odds_ratio = random.uniform(0.5, 2.0)
-                            p_value = random.uniform(0.01, 0.05)
-                            combined_score = random.uniform(1, 10)
-                            p_val = random.uniform(0.001, 0.05)
-                        writer.writerow({
-                            "subtitle": subtitlestr,
-                            "odds_ratio": f"{odds_ratio:.2f}",
-                            "fdr": f"{p_value:.3f}",
-                            "p-value": f"{p_val:.3f}",
-                            "combined_score": f"{combined_score:.2f}",
-                            "gene_set": ";".join(code_dict.keys())
-                        })
-        logging.info(f"RST file generation completed successfully for taxonomy ID: {taxonomy_id}")
-        return True
-    except Exception as e:
-        logging.error(f"Error generating RST files: {e}")
-        return False
+        else:
+            # Otherwise use the original function
+            generate_rst_file(
+                filename=rst_filename,
+                sections=sections,
+                filtered_genesets_df=filtered_genesets_df,
+                call_ncbi_api=False,
+                taxonomy_id=taxonomy_id
+            )
+
+        # Log additional information
+        num_references = sum(len(section.get('references', [])) for section in sections)
+        num_thematic_genesets = sum(len(section.get('thematic_geneset', [])) for section in sections)
+        logging.info(
+            f"Wrote {rst_filename} with {len(sections)} section(s), "
+            f"{num_references} references, and {num_thematic_genesets} thematic genesets."
+        )
+
+        # Generate CSV for each cluster similar to the original script
+        theme_title = sections[0].get('title', f"Theme {cluster_id+1}") if sections else f"Theme {cluster_id+1}"
+        m = re.match(r"Theme (\d+)\s*-\s*(.+)", theme_title)
+        if m:
+            theme_num, heading_str = m.groups()
+        else:
+            theme_num, heading_str = str(cluster_id+1), theme_title
+        sanitized_title = heading_str.replace(" ", "_")
+        csv_filename = os.path.join(csv_folder, f"Theme_{theme_num}_{sanitized_title}.csv")
+
+        with open(csv_filename, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ["subtitle", "odds_ratio", "p-value", "fdr", "combined_score", "gene_set"]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for section in sections:
+                if 'subtitle' in section:
+                    code_dict = {}
+                    if section.get('code_block'):
+                        try:
+                            code_dict = ast.literal_eval(section['code_block'])
+                        except (SyntaxError, ValueError):
+                            code_dict = {}
+                    subtitlestr = section['subtitle']
+                    filtered_row = filtered_genesets_df[filtered_genesets_df['Term'] == subtitlestr]
+                    if filtered_row.empty:
+                        raise KeyError(
+                            f"No enriched.csv entry for subtitle: {subtitlestr!r}. "
+                            "This violates the invariant clustered.Term ⊆ enriched.Term; "
+                            "check upstream collect_context / clustering steps."
+                        )
+                    odds_ratio = filtered_row['Odds Ratio'].values[0]
+                    p_value = filtered_row['Adjusted P-value'].values[0]
+                    combined_score = filtered_row['Combined Score'].values[0]
+                    p_val = filtered_row['P-value'].values[0]
+                    writer.writerow({
+                        "subtitle": subtitlestr,
+                        "odds_ratio": f"{odds_ratio:.2f}",
+                        "fdr": f"{p_value:.3f}",
+                        "p-value": f"{p_val:.3f}",
+                        "combined_score": f"{combined_score:.2f}",
+                        "gene_set": ";".join(code_dict.keys())
+                    })
+    logging.info(f"RST file generation completed successfully for taxonomy ID: {taxonomy_id}")
+    return True
 
 def generate_summary_page(output_folder, json_path, html_path):
     """

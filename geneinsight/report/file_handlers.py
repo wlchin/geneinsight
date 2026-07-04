@@ -87,44 +87,6 @@ def copy_input_files(input_folder, output_folder, gene_set):
     if missing_files:
         raise FileNotFoundError(f"Missing required input files: {', '.join(missing_files)}")
 
-    # For demonstration, also set up a filtered geneset file if it doesn't exist
-    filtered_path = os.path.join(output_folder, f"results/filtered_sets/{gene_set}_filtered_gene_sets.csv")
-    if not os.path.exists(filtered_path):
-        # Create it from clustered topics as a fallback
-        clustered_path = os.path.join(output_folder, f"results/clustered_topics/{gene_set}_clustered_topics.csv")
-        df = pd.read_csv(clustered_path)
-        # Add any required columns for filtered genesets if they don't exist
-        if 'Odds Ratio' not in df.columns:
-            df['Odds Ratio'] = 1.5  # Default value
-        if 'Adjusted P-value' not in df.columns:
-            df['Adjusted P-value'] = 0.05  # Default value
-        if 'P-value' not in df.columns:
-            df['P-value'] = 0.01  # Default value
-        if 'Combined Score' not in df.columns:
-            df['Combined Score'] = 5.0  # Default value
-        # Ensure the filtered_sets directory exists
-        os.makedirs(os.path.dirname(filtered_path), exist_ok=True)
-        df.to_csv(filtered_path, index=False)
-        logging.info(f"Created placeholder filtered geneset file at {filtered_path}")
-    
-    # Create a basic ontology dict if it doesn't exist
-    ontology_dict_path = os.path.join(output_folder, f"results/ontology_dict/{gene_set}_ontology_dict.csv")
-    if not os.path.exists(ontology_dict_path):
-        logging.info("Creating placeholder ontology dictionary")
-        # Create a basic ontology dict from clustered topics
-        clustered_path = os.path.join(output_folder, f"results/clustered_topics/{gene_set}_clustered_topics.csv")
-        df = pd.read_csv(clustered_path)
-        ontology_data = []
-        for _, row in df.iterrows():
-            ontology_data.append({
-                "query": row["Term"],
-                "ontology_dict": "{'GO:0000001 biological process': 'GENE1;GENE2;GENE3', 'GO:0000002 cellular component': 'GENE2;GENE3;GENE4'}"
-            })
-        # Ensure the ontology_dict directory exists
-        os.makedirs(os.path.dirname(ontology_dict_path), exist_ok=True)
-        pd.DataFrame(ontology_data).to_csv(ontology_dict_path, index=False)
-        logging.info(f"Created placeholder ontology dictionary at {ontology_dict_path}")
-
 def copy_logo(output_folder):
     """Copy logo file to data directory or create a placeholder."""
     import os

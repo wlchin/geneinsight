@@ -150,6 +150,43 @@ def test_copy_scripts(mock_logging_info, setup_test_dirs):
     """Test copy_scripts function (which is mostly a no-op)."""
     scripts_to_include = ["script1.py", "script2.py"]
     copy_scripts(TEST_OUTPUT_DIR, scripts_to_include)
-    
+
     # Check if the logging message was called
     mock_logging_info.assert_called_once_with("Scripts are part of the package - no copying needed")
+
+
+def test_copy_input_files_missing_ontology_dict_raises(setup_test_dirs, setup_test_files):
+    """If ontology_dict.csv is missing from input, copy_input_files must raise
+    FileNotFoundError rather than silently fabricating a placeholder ontology
+    with a dummy GO:0000001 entry."""
+    create_folder_structure(TEST_OUTPUT_DIR, TEST_GENE_SET)
+
+    # Remove ontology_dict.csv from the prepared input.
+    os.remove(os.path.join(TEST_INPUT_DIR, "ontology_dict.csv"))
+
+    with pytest.raises(FileNotFoundError, match="ontology_dict.csv"):
+        copy_input_files(TEST_INPUT_DIR, TEST_OUTPUT_DIR, TEST_GENE_SET)
+
+    # Confirm no placeholder ontology_dict was created.
+    placeholder_path = os.path.join(
+        TEST_OUTPUT_DIR, f"results/ontology_dict/{TEST_GENE_SET}_ontology_dict.csv"
+    )
+    assert not os.path.exists(placeholder_path)
+
+
+def test_copy_input_files_missing_enriched_raises(setup_test_dirs, setup_test_files):
+    """If enriched.csv is missing from input, copy_input_files must raise
+    FileNotFoundError rather than silently fabricating a placeholder with
+    Odds Ratio=1.5, P-value=0.01, Combined Score=5.0."""
+    create_folder_structure(TEST_OUTPUT_DIR, TEST_GENE_SET)
+
+    # Remove enriched.csv from the prepared input.
+    os.remove(os.path.join(TEST_INPUT_DIR, "enriched.csv"))
+
+    with pytest.raises(FileNotFoundError, match="enriched.csv"):
+        copy_input_files(TEST_INPUT_DIR, TEST_OUTPUT_DIR, TEST_GENE_SET)
+
+    placeholder_path = os.path.join(
+        TEST_OUTPUT_DIR, f"results/filtered_sets/{TEST_GENE_SET}_filtered_gene_sets.csv"
+    )
+    assert not os.path.exists(placeholder_path)

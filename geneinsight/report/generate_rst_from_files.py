@@ -6,7 +6,6 @@ from typing import List, Dict, Optional, Tuple
 import argparse
 import logging
 from datetime import datetime
-import random
 import requests
 from xml.etree import ElementTree
 from tqdm import tqdm
@@ -255,23 +254,21 @@ def generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api, t
                 
                 # Match subtitle with filtered_genesets_df
                 subtitle = section.get('subtitle')
-                if subtitle:
-                    logging.info(f"Fetching filtered row for subtitle: {subtitle}")
-                    filtered_row = filtered_genesets_df[filtered_genesets_df['Term'] == subtitle]
-                    if not filtered_row.empty:
-                        odds_ratio = filtered_row['Odds Ratio'].values[0]
-                        p_value = filtered_row['Adjusted P-value'].values[0]
-                        combined_score = filtered_row['Combined Score'].values[0]
-                    else:
-                        logging.warning(f"No filtered row found for subtitle: {subtitle}")
-                        odds_ratio = random.uniform(0.5, 2.0)
-                        p_value = random.uniform(0.01, 0.05)
-                        combined_score = random.uniform(1, 10)
-                else:
-                    logging.warning("No subtitle found for section")
-                    odds_ratio = random.uniform(0.5, 2.0)
-                    p_value = random.uniform(0.01, 0.05)
-                    combined_score = random.uniform(1, 10)
+                if not subtitle:
+                    raise KeyError(
+                        "Section missing 'subtitle' key — cannot resolve enriched.csv "
+                        f"entry. Section title: {section.get('title', '<no title>')!r}."
+                    )
+                logging.info(f"Fetching filtered row for subtitle: {subtitle}")
+                filtered_row = filtered_genesets_df[filtered_genesets_df['Term'] == subtitle]
+                if filtered_row.empty:
+                    raise KeyError(
+                        f"No enriched.csv entry for subtitle: {subtitle!r}. "
+                        "This violates the invariant clustered.Term ⊆ enriched.Term."
+                    )
+                odds_ratio = filtered_row['Odds Ratio'].values[0]
+                p_value = filtered_row['Adjusted P-value'].values[0]
+                combined_score = filtered_row['Combined Score'].values[0]
                 
                 # Add lines for key genes, odds ratio, p value, and combined score
                 f.write(f"    :abbr:`Key genes (These are the genes most commonly found in the StringDB references below, indicating their common presence across these sources)`: {keys_str}\n\n")
@@ -393,16 +390,15 @@ def main():
                             code_dict = {}
                     subtitlestr = section['subtitle']
                     filtered_row = filtered_genesets_df[filtered_genesets_df['Term'] == subtitlestr]
-                    if not filtered_row.empty:
-                        odds_ratio = filtered_row['Odds Ratio'].values[0]
-                        p_value = filtered_row['Adjusted P-value'].values[0]
-                        combined_score = filtered_row['Combined Score'].values[0]
-                        p_val = filtered_row['P-value'].values[0]
-                    else:
-                        odds_ratio = random.uniform(0.5, 2.0)
-                        p_value = random.uniform(0.01, 0.05)
-                        combined_score = random.uniform(1, 10)
-                        p_val = random.uniform(0.001, 0.01)
+                    if filtered_row.empty:
+                        raise KeyError(
+                            f"No enriched.csv entry for subtitle: {subtitlestr!r}. "
+                            "This violates the invariant clustered.Term ⊆ enriched.Term."
+                        )
+                    odds_ratio = filtered_row['Odds Ratio'].values[0]
+                    p_value = filtered_row['Adjusted P-value'].values[0]
+                    combined_score = filtered_row['Combined Score'].values[0]
+                    p_val = filtered_row['P-value'].values[0]
                     writer.writerow({
                         "subtitle": subtitlestr,
                         "odds_ratio": f"{odds_ratio:.2f}",

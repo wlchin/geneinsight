@@ -122,9 +122,10 @@ class Pipeline:
         for dir_path in self.dirs.values():
             os.makedirs(dir_path, exist_ok=True)
 
-        # Create sphinx_builds directory as a subfolder in the results folder.
+        # Register sphinx_builds path but create the directory lazily inside
+        # _generate_report. Eager creation produced misleading empty zips
+        # at Step 12 when reports were disabled.
         self.dirs["sphinx_builds"] = os.path.join(self.dirs["final"], "sphinx_builds")
-        os.makedirs(self.dirs["sphinx_builds"], exist_ok=True)
 
         # Set timestamp for run
         self.timestamp = time.strftime("%Y%m%d_%H%M%S")
@@ -362,15 +363,14 @@ class Pipeline:
             if generate_report:
                 self.console.rule("[bold cyan]Step 11: Generating report[/bold cyan]")
                 with self._time_stage("Step 11: Report Generation"):
+                    # _generate_report raises on failure; a None return now
+                    # indicates a code-path bug, not a build failure.
                     report_output = self._generate_report(
                         output_path=output_path,
                         query_gene_set=query_gene_set,
                         report_title=report_title
                     )
-                    if report_output:
-                        logger.info(f"Report generated successfully at {report_output}")
-                    else:
-                        logger.warning("Report generation failed or was skipped")
+                    logger.info(f"Report generated successfully at {report_output}")
                 self.console.print("[bold green]Done! Step 11 completed.[/bold green]")
 
             # Finalize and persist metrics BEFORE Step 12 zips and deletes output_path.
@@ -804,6 +804,10 @@ class Pipeline:
         logger.info(f"Generating report for taxonomy ID: {taxonomy_id}")
         logger.info(f"NCBI API calls: {'enabled' if self.call_ncbi_api else 'disabled'}")
 
+        # reports_pipeline.run_pipeline raises RuntimeError on any Sphinx/build
+        # failure — let it propagate. We intentionally do not wrap in try/except
+        # because silently swallowing a report failure produced 22-byte empty
+        # sphinx_builds.zip artifacts across all calibration batches.
         status, html_index = reports_pipeline.run_pipeline(
             input_folder=output_path,
             output_folder=report_out_dir,
@@ -812,15 +816,16 @@ class Pipeline:
             context_api_key=None,
             context_model=self.api_model,
             context_base_url=self.api_base_url,
-            taxonomy_id=taxonomy_id,      # Pass the taxonomy ID to the report pipeline
-            call_ncbi_api=self.call_ncbi_api  # Use the class parameter for NCBI API calls
+            taxonomy_id=taxonomy_id,
+            call_ncbi_api=self.call_ncbi_api,
         )
-        if status and html_index:
-            logger.info(f"Report generated successfully at {html_index}")
-            return html_index
-        else:
-            logger.error("Report generation failed.")
-            return None
+        if not (status and html_index):
+            raise RuntimeError(
+                "report_pipeline.run_pipeline returned success=False without raising; "
+                "this is an internal contract violation."
+            )
+        logger.info(f"Report generated successfully at {html_index}")
+        return html_index
 
     def _finalize_outputs(self, run_id: str, dataframes: Dict[str, pd.DataFrame]) -> str:
         """

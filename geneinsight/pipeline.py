@@ -394,6 +394,23 @@ class Pipeline:
                     self._reorganize_output_directory(output_path)
             self.console.print("[bold green]Done! Step 12 completed.[/bold green]")
 
+            # If a report was generated, write a top-level redirect file so
+            # the user has a stable path to open. Note: report_output from
+            # _generate_report is STALE after Step 12 because
+            # _reorganize_output_directory un-nests sphinx_builds/results/
+            # sphinx_builds/ -> sphinx_builds/. Recompute the deterministic
+            # post-reorganize path instead of trusting the cached return.
+            report_redirect_path = None
+            if generate_report and report_output:
+                post_reorg_index = self._post_reorganize_report_path(gene_set_name)
+                if os.path.exists(post_reorg_index):
+                    report_redirect_path = self._write_report_redirect(post_reorg_index)
+                else:
+                    logger.warning(
+                        f"Expected report index at {post_reorg_index} after Step 12 "
+                        "but file is missing; skipping report.html redirect."
+                    )
+
             # Display metrics summary (unless quiet mode) — metrics already saved above
             if self.metrics_collector and not self.quiet_metrics:
                 self.console.print("")
@@ -401,10 +418,10 @@ class Pipeline:
                 summary = format_metrics_summary(metrics)
                 self.console.print(summary)
 
-            self.console.print("[bold green]Pipeline completed successfully![/bold green]")
-            self.console.print(f"Results available at: [bold]{output_path + '.zip'}[/bold]")
-            if generate_report:
-                self.console.print(f"Report available at: [bold]{self.dirs['sphinx_builds']+ '.zip'}[/bold]")
+            self._print_completion_summary(
+                output_zip=output_path + ".zip",
+                report_redirect_path=report_redirect_path,
+            )
             logger.info(f"Pipeline completed successfully. Results available at: {self.dirs['final']}")
             return self.dirs["final"]
 
@@ -486,8 +503,18 @@ class Pipeline:
         except Exception as e:
             logger.error(f"Error reorganizing output directory: {e}", exc_info=True)
 
+    # Directories that should be kept on disk alongside their zip archive so
+    # users can browse them directly without unzipping. Add names here only
+    # when the directory's primary value is interactive browsing (e.g., HTML).
+    _KEEP_AFTER_ZIP = frozenset({"sphinx_builds"})
+
     def _zip_results_folders(self, results_dir: str):
-        """Zip each folder within the results directory."""
+        """Zip each folder within the results directory.
+
+        Directories listed in _KEEP_AFTER_ZIP are zipped but not removed,
+        so the user can navigate them directly (e.g., open the Sphinx HTML
+        report without first unzipping sphinx_builds.zip).
+        """
         from .utils.zip_helper import zip_directory
         try:
             logger.debug("Zipping folders in results directory")
@@ -500,7 +527,8 @@ class Pipeline:
                 zip_path = os.path.join(results_dir, f"{dir_name}.zip")
                 logger.debug(f"Zipping directory: {dir_path} -> {zip_path}")
                 zip_directory(dir_path, zip_path)
-                shutil.rmtree(dir_path)
+                if dir_name not in self._KEEP_AFTER_ZIP:
+                    shutil.rmtree(dir_path)
             logger.debug(f"Zipped {len(dirs_to_zip)} directories in results folder")
         except Exception as e:
             logger.error(f"Error zipping results folders: {e}", exc_info=True)
@@ -826,6 +854,79 @@ class Pipeline:
             )
         logger.info(f"Report generated successfully at {html_index}")
         return html_index
+
+    def _post_reorganize_report_path(self, gene_set_name: str) -> str:
+        """
+        Compute the deterministic post-Step-12 path to the Sphinx HTML
+        index for a given gene_set_name.
+
+        _generate_report (Step 11) returns a path nested inside
+        sphinx_builds/results/sphinx_builds/, which _reorganize_output_directory
+        (Step 12) un-nests by copying contents up one level. After Step 12 the
+        real index.html lives at this deterministic location.
+
+        Use this method (NOT the cached _generate_report return value) when
+        looking up the report after Step 12 has run.
+        """
+        return os.path.join(
+            self.dirs["sphinx_builds"],
+            f"html_build_{gene_set_name}",
+            "build", "html", "index.html",
+        )
+
+    def _write_report_redirect(self, html_index_path: str) -> str:
+        """
+        Write a small HTML meta-refresh file at <results>/report.html that
+        redirects to the deep Sphinx index.html. Gives the user a single
+        memorable path to open the report (stable across runs and
+        gene-set names).
+
+        Returns the absolute path to the created redirect file.
+        """
+        from urllib.parse import quote
+        results_dir = self.dirs["final"]
+        redirect_path = os.path.join(results_dir, "report.html")
+        rel_target = os.path.relpath(html_index_path, start=results_dir)
+        url_target = "/".join(quote(seg) for seg in rel_target.split(os.sep))
+        content = (
+            "<!DOCTYPE html>\n"
+            "<html><head>\n"
+            f'<meta http-equiv="refresh" content="0; url={url_target}">\n'
+            "<title>GeneInsight Report</title>\n"
+            "</head><body>\n"
+            f'<p>Redirecting to <a href="{url_target}">report</a>...</p>\n'
+            "</body></html>\n"
+        )
+        with open(redirect_path, "w") as f:
+            f.write(content)
+        return os.path.abspath(redirect_path)
+
+    def _print_completion_summary(self, output_zip: str, report_redirect_path: "str | None") -> None:
+        """
+        Print the final 'Pipeline completed successfully' summary with a
+        cmd-clickable file:// URL to the report (when one was generated).
+        The URL is rendered via rich.text.Text so paths containing markup
+        meta-characters ('[', ']') are treated as literal text rather than
+        being parsed (which would crash rich's markup parser).
+        Modern terminals render the OSC-8 hyperlink as clickable; older
+        terminals fall back to plain text which iTerm2 auto-linkifies.
+        """
+        from rich.text import Text
+        self.console.print("[bold green]Pipeline completed successfully![/bold green]")
+        # Bold via Text() to avoid markup-parsing the output_zip path (which
+        # could contain '[' on legal filesystems).
+        results_line = Text("Results: ", style="default")
+        results_line.append(output_zip, style="bold")
+        self.console.print(results_line)
+        if report_redirect_path:
+            report_url = f"file://{report_redirect_path}"
+            report_line = Text("Report:  ", style="default")
+            report_line.append(report_url, style=f"bold cyan link {report_url}")
+            self.console.print(report_line)
+            archive_line = Text("         (archive: ", style="default")
+            archive_line.append(self.dirs["sphinx_builds"] + ".zip", style="bold")
+            archive_line.append(")")
+            self.console.print(archive_line)
 
     def _finalize_outputs(self, run_id: str, dataframes: Dict[str, pd.DataFrame]) -> str:
         """

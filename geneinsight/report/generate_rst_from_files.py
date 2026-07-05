@@ -286,11 +286,14 @@ def generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api, t
 
                 # Add lines for key genes, odds ratio, p value, and combined score.
                 # When the empirical stats are available for this row we relabel
-                # the parametric FDR line to "FDR (parametric)" so the reader
+                # the parametric FDR line to "Parametric FDR" so the reader
                 # can distinguish it from the "Empirical q" line below. When
                 # empirical stats are absent the report renders identically
                 # to versions before the --empirical-p feature existed.
-                fdr_label = "FDR (parametric)" if has_empirical else "FDR"
+                # NOTE: the label must be paren-free — Sphinx's :abbr:`LABEL
+                # (TOOLTIP)` role uses the first '(' as the tooltip delimiter,
+                # so parens inside the label collide with the parser.
+                fdr_label = "Parametric FDR" if has_empirical else "FDR"
                 fdr_tooltip = (
                     "Benjamini-Hochberg adjusted P-value from the parametric "
                     "hypergeometric test — the expected proportion of false "

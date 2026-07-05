@@ -109,7 +109,7 @@ def test_generate_rst_file_emits_empirical_lines_when_columns_present(tmp_path):
     """When filtered_genesets_df has p_empirical + q_empirical columns and
     the row's values are not NaN, the RST output must include two extra
     :abbr: lines (Empirical p, Empirical q) between FDR and Combined Score,
-    and the FDR label must be renamed to 'FDR (parametric)'."""
+    and the FDR label must be renamed to 'Parametric FDR'."""
     out_path = tmp_path / "cluster_0.rst"
     generate_rst_file(
         filename=str(out_path),
@@ -124,7 +124,7 @@ def test_generate_rst_file_emits_empirical_lines_when_columns_present(tmp_path):
     assert ":abbr:`Empirical q " in content, "Missing Empirical q line"
     assert "0.003" in content, "Empirical p value 0.0031 not formatted"
     assert "0.012" in content, "Empirical q value 0.012 not formatted"
-    assert ":abbr:`FDR (parametric) " in content, "FDR label not renamed"
+    assert ":abbr:`Parametric FDR " in content, "FDR label not renamed"
     assert ":abbr:`FDR (False Discovery Rate " not in content, (
         "Old FDR tooltip text still present; label should be renamed when "
         "empirical columns are present"
@@ -132,7 +132,7 @@ def test_generate_rst_file_emits_empirical_lines_when_columns_present(tmp_path):
 
     # Ordering check: empirical lines sit between the FDR line and the
     # Combined Score line, matching the layout spec.
-    fdr_idx = content.index(":abbr:`FDR (parametric)")
+    fdr_idx = content.index(":abbr:`Parametric FDR")
     emp_p_idx = content.index(":abbr:`Empirical p")
     emp_q_idx = content.index(":abbr:`Empirical q")
     cs_idx = content.index(":abbr:`Combined Score")
@@ -160,7 +160,7 @@ def test_generate_rst_file_omits_empirical_when_columns_absent(tmp_path):
     assert ":abbr:`FDR (False Discovery Rate " in content, (
         "FDR label should be unchanged when empirical columns are absent"
     )
-    assert ":abbr:`FDR (parametric)" not in content
+    assert ":abbr:`Parametric FDR" not in content
 
 
 def test_generate_rst_file_omits_empirical_when_row_value_is_nan(tmp_path):
@@ -183,3 +183,25 @@ def test_generate_rst_file_omits_empirical_when_row_value_is_nan(tmp_path):
 
     assert ":abbr:`Empirical" not in content
     assert "nan" not in content.lower()
+
+
+def test_generate_rst_file_fdr_label_has_no_parens_regression(tmp_path):
+    """Regression: 'FDR (parametric)' as an :abbr: label was misparsed by
+    Sphinx because parens in the label conflict with the tooltip delimiter,
+    producing 'FDR' as the visible label and a garbled tooltip. The label
+    must be paren-free so 'first paren opens tooltip' is unambiguous."""
+    out_path = tmp_path / "cluster_0.rst"
+    generate_rst_file(
+        filename=str(out_path),
+        sections=[_minimal_section_with_subtitle()],
+        filtered_genesets_df=_filtered_df_with_empirical(),
+        call_ncbi_api=False,
+        taxonomy_id="9606",
+    )
+    content = out_path.read_text()
+
+    # The label chosen must not contain parens (would collide with :abbr:'s
+    # tooltip delimiter). Concrete asserts on the current-choice label:
+    assert ":abbr:`Parametric FDR (" in content
+    # And guard against the broken form:
+    assert ":abbr:`FDR (parametric)" not in content

@@ -269,11 +269,51 @@ def generate_rst_file(filename, sections, filtered_genesets_df, call_ncbi_api, t
                 odds_ratio = filtered_row['Odds Ratio'].values[0]
                 p_value = filtered_row['Adjusted P-value'].values[0]
                 combined_score = filtered_row['Combined Score'].values[0]
-                
-                # Add lines for key genes, odds ratio, p value, and combined score
+
+                # Empirical p / q are optional: present only when the pipeline
+                # was run with --empirical-p AND the query size fell inside
+                # the 1-500 bin range. Presence is decided per-row.
+                p_empirical = None
+                q_empirical = None
+                if 'p_empirical' in filtered_row.columns:
+                    p_emp_raw = filtered_row['p_empirical'].values[0]
+                    q_emp_raw = filtered_row['q_empirical'].values[0]
+                    if pd.notna(p_emp_raw) and pd.notna(q_emp_raw):
+                        p_empirical = float(p_emp_raw)
+                        q_empirical = float(q_emp_raw)
+
+                has_empirical = p_empirical is not None
+
+                # Add lines for key genes, odds ratio, p value, and combined score.
+                # When the empirical stats are available for this row we relabel
+                # the parametric FDR line to "FDR (parametric)" so the reader
+                # can distinguish it from the "Empirical q" line below. When
+                # empirical stats are absent the report renders identically
+                # to versions before the --empirical-p feature existed.
+                fdr_label = "FDR (parametric)" if has_empirical else "FDR"
+                fdr_tooltip = (
+                    "Benjamini-Hochberg adjusted P-value from the parametric "
+                    "hypergeometric test — the expected proportion of false "
+                    "positives among significant results"
+                    if has_empirical
+                    else "False Discovery Rate - The expected proportion of "
+                    "false positives among all statistically significant "
+                    "results (subthemes) in multiple hypothesis testing"
+                )
                 f.write(f"    :abbr:`Key genes (These are the genes most commonly found in the StringDB references below, indicating their common presence across these sources)`: {keys_str}\n\n")
                 f.write(f"    :abbr:`Odds Ratio (The Odds Ratio measures how much more likely a gene set is to be enriched in a pathway compared to random chance)`: {odds_ratio:.2f}\n\n")
-                f.write(f"    :abbr:`FDR (False Discovery Rate - The expected proportion of false positives among all statistically significant results (subthemes) in multiple hypothesis testing)`: {p_value:.3f}\n\n")
+                f.write(f"    :abbr:`{fdr_label} ({fdr_tooltip})`: {p_value:.3f}\n\n")
+                if has_empirical:
+                    f.write(
+                        f"    :abbr:`Empirical p (Empirical p-value computed against "
+                        f"a size-stratified null pool of random-query pipeline runs; "
+                        f"smaller = more extreme than random)`: {p_empirical:.3f}\n\n"
+                    )
+                    f.write(
+                        f"    :abbr:`Empirical q (Within-run Benjamini-Hochberg "
+                        f"adjustment of the empirical p — the empirically calibrated "
+                        f"FDR analogue)`: {q_empirical:.3f}\n\n"
+                    )
                 f.write(f"    :abbr:`Combined Score (The Combined Score measures the overall importance of a pathway, relative to other enriched pathways by combining statistical significance (p-value) and enrichment strength (z-score).)`: {combined_score:.2f}\n\n")
 
             # Add main content
@@ -376,8 +416,13 @@ def main():
         sanitized_title = heading_str.replace(" ", "_")
         csv_filename = csv_path / f"Theme_{theme_num}_{sanitized_title}.csv"
 
+        has_empirical = "p_empirical" in filtered_genesets_df.columns
+        fieldnames = ["subtitle", "odds_ratio", "p-value", "fdr"]
+        if has_empirical:
+            fieldnames += ["empirical_p", "empirical_q"]
+        fieldnames += ["combined_score", "gene_set"]
+
         with open(csv_filename, 'w', newline='', encoding='utf-8') as csvfile:
-            fieldnames = ["subtitle", "odds_ratio", "p-value", "fdr", "combined_score", "gene_set"]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             for section in sections:
@@ -399,14 +444,20 @@ def main():
                     p_value = filtered_row['Adjusted P-value'].values[0]
                     combined_score = filtered_row['Combined Score'].values[0]
                     p_val = filtered_row['P-value'].values[0]
-                    writer.writerow({
+                    row_out = {
                         "subtitle": subtitlestr,
                         "odds_ratio": f"{odds_ratio:.2f}",
                         "fdr": f"{p_value:.3f}",
                         "p-value": f"{p_val:.3f}",
                         "combined_score": f"{combined_score:.2f}",
-                        "gene_set": ";".join(code_dict.keys())
-                    })
+                        "gene_set": ";".join(code_dict.keys()),
+                    }
+                    if has_empirical:
+                        p_emp = filtered_row['p_empirical'].values[0]
+                        q_emp = filtered_row['q_empirical'].values[0]
+                        row_out["empirical_p"] = "" if pd.isna(p_emp) else f"{float(p_emp):.3f}"
+                        row_out["empirical_q"] = "" if pd.isna(q_emp) else f"{float(q_emp):.3f}"
+                    writer.writerow(row_out)
 
     logging.info(f"RST file generation completed for taxonomy ID: {args.taxonomy_id} (prefix: {species_prefix})")
 

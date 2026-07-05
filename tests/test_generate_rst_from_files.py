@@ -64,3 +64,122 @@ def test_generate_rst_file_raises_when_section_has_no_subtitle(
             call_ncbi_api=False,
             taxonomy_id="9606",
         )
+
+
+import numpy as np
+
+
+def _filtered_df_with_empirical(term="known_term"):
+    """Return a filtered_genesets_df that includes p_empirical / q_empirical."""
+    return pd.DataFrame({
+        "Term": [term],
+        "Odds Ratio": [523.72],
+        "Adjusted P-value": [0.005],
+        "Combined Score": [2437.93],
+        "P-value": [0.001],
+        "p_empirical": [0.0031],
+        "q_empirical": [0.012],
+    })
+
+
+def _filtered_df_without_empirical(term="known_term"):
+    """Return a filtered_genesets_df WITHOUT the empirical columns
+    (models the state when --empirical-p was not used)."""
+    return pd.DataFrame({
+        "Term": [term],
+        "Odds Ratio": [523.72],
+        "Adjusted P-value": [0.005],
+        "Combined Score": [2437.93],
+        "P-value": [0.001],
+    })
+
+
+def _minimal_section_with_subtitle():
+    return {
+        "title": "Theme 1 - Test",
+        "subtitle": "known_term",
+        "content": "Body.",
+        "references": [],
+        "thematic_geneset": [],
+        "code_block": "{'GENE1': 'desc'}",
+    }
+
+
+def test_generate_rst_file_emits_empirical_lines_when_columns_present(tmp_path):
+    """When filtered_genesets_df has p_empirical + q_empirical columns and
+    the row's values are not NaN, the RST output must include two extra
+    :abbr: lines (Empirical p, Empirical q) between FDR and Combined Score,
+    and the FDR label must be renamed to 'FDR (parametric)'."""
+    out_path = tmp_path / "cluster_0.rst"
+    generate_rst_file(
+        filename=str(out_path),
+        sections=[_minimal_section_with_subtitle()],
+        filtered_genesets_df=_filtered_df_with_empirical(),
+        call_ncbi_api=False,
+        taxonomy_id="9606",
+    )
+    content = out_path.read_text()
+
+    assert ":abbr:`Empirical p " in content, "Missing Empirical p line"
+    assert ":abbr:`Empirical q " in content, "Missing Empirical q line"
+    assert "0.003" in content, "Empirical p value 0.0031 not formatted"
+    assert "0.012" in content, "Empirical q value 0.012 not formatted"
+    assert ":abbr:`FDR (parametric) " in content, "FDR label not renamed"
+    assert ":abbr:`FDR (False Discovery Rate " not in content, (
+        "Old FDR tooltip text still present; label should be renamed when "
+        "empirical columns are present"
+    )
+
+    # Ordering check: empirical lines sit between the FDR line and the
+    # Combined Score line, matching the layout spec.
+    fdr_idx = content.index(":abbr:`FDR (parametric)")
+    emp_p_idx = content.index(":abbr:`Empirical p")
+    emp_q_idx = content.index(":abbr:`Empirical q")
+    cs_idx = content.index(":abbr:`Combined Score")
+    assert fdr_idx < emp_p_idx < emp_q_idx < cs_idx
+
+
+def test_generate_rst_file_omits_empirical_when_columns_absent(tmp_path):
+    """When filtered_genesets_df does NOT have the empirical columns
+    (i.e. --empirical-p was not used), the RST output must be identical
+    to today's format: three abbr lines (Odds Ratio, FDR, Combined Score),
+    no Empirical lines, and the FDR label unchanged."""
+    out_path = tmp_path / "cluster_0.rst"
+    generate_rst_file(
+        filename=str(out_path),
+        sections=[_minimal_section_with_subtitle()],
+        filtered_genesets_df=_filtered_df_without_empirical(),
+        call_ncbi_api=False,
+        taxonomy_id="9606",
+    )
+    content = out_path.read_text()
+
+    assert ":abbr:`Empirical" not in content, (
+        "Empirical lines should not be emitted when p_empirical column is absent"
+    )
+    assert ":abbr:`FDR (False Discovery Rate " in content, (
+        "FDR label should be unchanged when empirical columns are absent"
+    )
+    assert ":abbr:`FDR (parametric)" not in content
+
+
+def test_generate_rst_file_omits_empirical_when_row_value_is_nan(tmp_path):
+    """When the column exists but the specific row has NaN empirical values
+    (e.g. query gene count outside the 1-500 bin range), the row's rendering
+    should skip the empirical lines rather than write 'nan'."""
+    df = _filtered_df_with_empirical()
+    df.loc[0, "p_empirical"] = np.nan
+    df.loc[0, "q_empirical"] = np.nan
+
+    out_path = tmp_path / "cluster_0.rst"
+    generate_rst_file(
+        filename=str(out_path),
+        sections=[_minimal_section_with_subtitle()],
+        filtered_genesets_df=df,
+        call_ncbi_api=False,
+        taxonomy_id="9606",
+    )
+    content = out_path.read_text()
+
+    assert ":abbr:`Empirical" not in content
+    assert "nan" not in content.lower()

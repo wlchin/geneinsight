@@ -143,8 +143,13 @@ def generate_rst_files(headings_path, merged_path, filtered_sets_path, output_di
         sanitized_title = heading_str.replace(" ", "_")
         csv_filename = os.path.join(csv_folder, f"Theme_{theme_num}_{sanitized_title}.csv")
 
+        has_empirical = "p_empirical" in filtered_genesets_df.columns
+        fieldnames = ["subtitle", "odds_ratio", "p-value", "fdr"]
+        if has_empirical:
+            fieldnames += ["empirical_p", "empirical_q"]
+        fieldnames += ["combined_score", "gene_set"]
+
         with open(csv_filename, 'w', newline='', encoding='utf-8') as csvfile:
-            fieldnames = ["subtitle", "odds_ratio", "p-value", "fdr", "combined_score", "gene_set"]
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             for section in sections:
@@ -167,14 +172,21 @@ def generate_rst_files(headings_path, merged_path, filtered_sets_path, output_di
                     p_value = filtered_row['Adjusted P-value'].values[0]
                     combined_score = filtered_row['Combined Score'].values[0]
                     p_val = filtered_row['P-value'].values[0]
-                    writer.writerow({
+                    row_out = {
                         "subtitle": subtitlestr,
                         "odds_ratio": f"{odds_ratio:.2f}",
                         "fdr": f"{p_value:.3f}",
                         "p-value": f"{p_val:.3f}",
                         "combined_score": f"{combined_score:.2f}",
-                        "gene_set": ";".join(code_dict.keys())
-                    })
+                        "gene_set": ";".join(code_dict.keys()),
+                    }
+                    if has_empirical:
+                        p_emp = filtered_row['p_empirical'].values[0]
+                        q_emp = filtered_row['q_empirical'].values[0]
+                        # NaN → empty string (renders as blank cell in Excel).
+                        row_out["empirical_p"] = "" if pd.isna(p_emp) else f"{float(p_emp):.3f}"
+                        row_out["empirical_q"] = "" if pd.isna(q_emp) else f"{float(q_emp):.3f}"
+                    writer.writerow(row_out)
     logging.info(f"RST file generation completed successfully for taxonomy ID: {taxonomy_id}")
     return True
 

@@ -83,6 +83,15 @@ def generate_rst_files(headings_path, merged_path, filtered_sets_path, output_di
     # Read filtered gene sets CSV into a DataFrame
     filtered_genesets_df = pd.read_csv(filtered_sets_path)
 
+    # Empirical-column presence and CSV fieldnames depend only on
+    # filtered_genesets_df.columns and are loop-invariant across clusters,
+    # so compute them once here.
+    has_empirical = "p_empirical" in filtered_genesets_df.columns
+    fieldnames = ["subtitle", "odds_ratio", "p-value", "fdr"]
+    if has_empirical:
+        fieldnames += ["empirical_p", "empirical_q"]
+    fieldnames += ["combined_score", "gene_set"]
+
     # Invariant check: every subtitle that will be written must resolve to a
     # Term in filtered_genesets_df. clustered.Term is built from enriched.csv
     # upstream (pipeline.py: _filter_topics -> _run_clustering); if this set
@@ -142,12 +151,6 @@ def generate_rst_files(headings_path, merged_path, filtered_sets_path, output_di
             theme_num, heading_str = str(cluster_id+1), theme_title
         sanitized_title = heading_str.replace(" ", "_")
         csv_filename = os.path.join(csv_folder, f"Theme_{theme_num}_{sanitized_title}.csv")
-
-        has_empirical = "p_empirical" in filtered_genesets_df.columns
-        fieldnames = ["subtitle", "odds_ratio", "p-value", "fdr"]
-        if has_empirical:
-            fieldnames += ["empirical_p", "empirical_q"]
-        fieldnames += ["combined_score", "gene_set"]
 
         with open(csv_filename, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)

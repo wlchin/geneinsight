@@ -94,8 +94,6 @@ def test_generate_rst_files_raises_early_when_invariant_violated(
 
 import csv
 
-import numpy as np
-
 
 @pytest.fixture
 def headings_csv_with_empirical(tmp_path):
